@@ -1,0 +1,175 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "项目架构分析与规划",
+        "description": "对LocalAudioTran-LLM-Summar后端和transcript-seeker前端进行全面架构分析，确定集成策略和技术实施路径。",
+        "details": "本任务将执行以下工作：\n\n1. **后端架构分析**：\n   - 详细审查FastAPI后端代码结构，识别核心模块和依赖关系\n   - 分析transcription.py和summarization.py的代码质量、性能瓶颈和优化空间\n   - 评估Whisper模型集成方式，特别关注词级时间戳功能的实现可能性\n   - 检查Docker配置文件，评估部署流程的完整性和可靠性\n   - 识别缺失的关键功能模块（用户认证、数据持久化、API安全性）\n\n2. **前端架构分析**：\n   - 分析React/TypeScript组件结构、状态管理和数据流\n   - 记录所有外部API调用点（Gladia、AssemblyAI等）及其接口规范\n   - 评估音频播放器实现和时间戳同步机制的技术细节\n   - 分析UI组件库使用情况，评估组件复用性和可定制化程度\n   - 检查用户认证流程和数据管理逻辑的实现方式\n\n3. **集成策略规划**：\n   - 制定FastAPI与React前端的通信策略（REST API规范、数据格式）\n   - 评估Whisper模型集成的技术路径和资源需求\n   - 设计数据流转图，明确前后端数据交换格式和验证规则\n   - 制定\"换脑手术\"（替换核心功能）的分步实施计划\n   - 识别潜在技术风险并提出缓解策略\n\n4. **输出文档**：\n   - 完整的架构分析报告（包含组件图、数据流图）\n   - 技术债务清单和优先级排序\n   - 集成实施路线图和里程碑计划\n   - 关键技术风险评估矩阵",
+        "testStrategy": "1. **文档完整性验证**：\n   - 确认架构分析报告包含所有要求的组件和模块分析\n   - 验证技术债务清单是否详尽且有明确的优先级\n   - 检查集成路线图是否包含具体的时间节点和可交付成果\n\n2. **技术可行性验证**：\n   - 与技术团队一起审查Whisper词级时间戳实现方案的可行性\n   - 验证FastAPI与React集成方案是否考虑了所有边缘情况\n   - 确认Docker配置分析是否全面且提供了明确的优化建议\n\n3. **风险评估验收**：\n   - 检查风险评估矩阵是否包含所有已识别的技术风险\n   - 验证每个风险是否有对应的缓解策略和应急计划\n   - 确认高风险项目（如词级时间戳）有详细的技术探索路径\n\n4. **同行评审**：\n   - 组织架构师和高级开发人员对分析报告进行评审\n   - 收集反馈并确保所有关键问题都得到解决\n   - 最终文档必须获得技术负责人的正式批准",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "深度分析LocalAudioTran-LLM-Summar项目",
+            "description": "分析现有FastAPI后端架构、API设计、代码质量和可扩展性",
+            "details": "- 分析backend/app/services/transcription.py的Whisper集成方式\n- 评估backend/app/services/summarization.py的LLM处理逻辑\n- 检查Docker配置和部署流程\n- 识别需要强化的功能模块（用户管理、数据库、词级时间戳）\n<info added on 2025-06-19T11:54:40.542Z>\n## 📋 项目架构总览\n- **项目性质**: 完整的音频转录+AI摘要解决方案，包含后端API和Streamlit前端\n- **核心技术栈**: FastAPI + Whisper + Ollama(Phi4模型) + Streamlit\n- **部署方式**: Docker容器化，支持GPU加速\n\n## 🏗️ 后端架构分析（FastAPI）\n\n### API结构\n- **主入口**: `/transcribe` - 单一端点处理完整音频转录+摘要流程\n- **健康检查**: `/health` - 服务状态监控\n- **响应格式**: 包含转录文本、结构化摘要和处理时间统计\n\n### 核心服务模块\n1. **TranscriptionService (transcription.py)**\n   - 使用openai-whisper==20240930版本\n   - 支持GPU加速（CUDA）\n   - 自动语言检测功能\n   - **❌ 关键缺失: 目前只返回纯文本，没有时间戳信息**\n   - 模型可配置（默认medium）\n   - 内存管理：初始化时加载模型，关闭时卸载\n\n2. **SummarizationService (summarization.py)**\n   - 使用Ollama + Phi4:14b-q4_K_M模型\n   - 本地LLM推理，无外部API依赖\n   - **结构化摘要输出**：\n     - 概述 (overview)\n     - 主要观点 (main_points)\n     - 关键洞察 (key_insights)  \n     - 待办事项 (action_items_decisions)\n     - 待解决问题 (open_questions_next_steps)\n     - 结论 (conclusions)\n   - 智能文本解析，支持中英文双语\n\n### 数据模型\n- **当前状态**: 极简模式，只有TranscriptionResponse基础模型\n- **❌ 缺失关键功能**:\n  - 用户管理模型\n  - 会议数据持久化\n  - 数据库集成（无SQLAlchemy或其他ORM）\n\n## 🐳 Docker配置分析\n\n### 优势\n- **GPU支持**: 完整的NVIDIA GPU配置\n- **模型缓存**: whisper-models和huggingface-models持久化卷\n- **网络模式**: host模式，简化服务间通信\n- **环境隔离**: 完整的.env文件支持\n\n### Ollama集成\n- 本地模型推理服务\n- Phi4:14b-q4_K_M模型预配置\n- 高性能推理配置（131K上下文长度，GPU加速）\n\n## ⚠️ 识别的关键问题和风险\n\n### 🔴 最高优先级问题\n1. **缺失词级时间戳功能** \n   - 当前Whisper集成只返回纯文本\n   - 需要升级到支持word-level timestamps的版本\n   - 这是与transcript-seeker集成的最大技术风险\n\n2. **无数据持久化层**\n   - 没有数据库集成\n   - 无用户管理系统\n   - 无会议历史存储\n\n## 🎯 强化建议（对应PRD第一阶段）\n\n### 立即行动项目\n1. **Whisper升级**: 集成stable-ts或faster-whisper获取词级时间戳\n2. **数据库集成**: 添加PostgreSQL + SQLAlchemy ORM\n3. **用户认证**: 实现JWT令牌系统\n4. **API扩展**: 设计RESTful API支持CRUD操作\n</info added on 2025-06-19T11:54:40.542Z>",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 2,
+            "title": "深度分析transcript-seeker前端项目",
+            "description": "分析React/TypeScript前端架构、外部API调用点和UI组件复用价值",
+            "details": "- 识别所有外部API调用点（Gladia、AssemblyAI等）\n- 分析音频播放器和时间戳同步功能的实现方式\n- 评估UI组件的复用价值和可定制性\n- 分析用户认证和数据管理逻辑\n<info added on 2025-06-19T11:59:20.871Z>\n# transcript-seeker前端项目架构分析结果\n\n## 项目架构总览\n- 现代化monorepo（Turborepo）结构，包含多个子应用\n- 核心应用为React + TypeScript + Vite构建的Web前端\n- 主要用途是浏览器转录查看器和管理器，支持AI聊天和笔记功能\n\n## 技术栈详情\n- **前端框架**: React 19 + TypeScript + Vite\n- **路由**: React Router DOM\n- **样式**: TailwindCSS\n- **状态管理**: Zustand + SWR\n- **UI组件**: 自建组件系统 @meeting-baas/ui（基于shadcn/ui）\n- **表单处理**: react-hook-form + zod验证\n- **编辑器**: novel（基于Tiptap的富文本编辑器）\n- **数据库**: Drizzle ORM\n\n## 外部API集成分析\n1. **AssemblyAI集成**\n   - 支持词级时间戳和话者分离\n   - 使用REST API + 轮询方式\n   - 提供摘要功能和异步转录\n\n2. **Gladia集成**\n   - 支持词级时间戳和话者分离\n   - 文件上传 + 异步轮询方式\n   - 多语言支持\n\n3. **OpenAI集成**\n   - 用于AI聊天功能\n   - 基于转录内容的智能对话\n\n## 核心功能模块\n1. **音频/视频播放器**\n   - 使用@vidstack/react引擎\n   - 完整实现时间戳功能\n   - 支持程序化跳转到指定时间点\n\n2. **转录文本渲染**\n   - 词级渲染与时间戳同步\n   - 实时高亮当前播放词\n   - 支持转录内容搜索和智能滚动\n\n3. **笔记系统与AI聊天功能**\n   - 基于Novel编辑器的笔记功能\n   - 基于转录内容的AI问答\n   - 数据持久化存储\n\n## 音频-文字同步实现\n- 使用精确的词级时间戳数据结构\n- 基于时间距离的最优匹配算法\n- 智能滚动和用户交互优化\n\n## 技术优势与挑战\n- **优势**: 完整词级时间戳支持、模块化UI架构、完整功能生态\n- **需替换**: AssemblyAI、Gladia和OpenAI API调用\n- **架构调整**: 创建本地API服务层、改造上传流程\n\n## 实施策略\n- API层替换保留UI组件和交互逻辑\n- 确保数据格式对齐保持接口不变\n- 利用本地项目增强功能\n</info added on 2025-06-19T11:59:20.871Z>",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 3,
+            "title": "Whisper词级时间戳技术可行性验证（最高风险）",
+            "description": "验证Whisper词级时间戳的技术实现可行性和精度要求",
+            "details": "- 研究stable-ts、faster-whisper等支持词级时间戳的库\n- 测试词级时间戳的精度和性能\n- 验证时间戳格式与前端音频播放器的兼容性\n- 评估潜在的技术风险和解决方案\n<info added on 2025-06-19T12:01:52.994Z>\n# 技术可行性结论：✅ 可行性高\n\n## 可用技术方案分析\n\n### 1. faster-whisper + word_timestamps=True\n- **✅ 优势**：\n  - 原生支持词级时间戳（word_timestamps=True）\n  - 性能优异：比openai-whisper快1.6-4.7x\n  - 内存占用更少\n  - 支持GPU和CPU部署\n  - 与CTranslate2集成，优化推理速度\n  - 支持int8量化，进一步提升速度\n\n- **⚠️ 挑战**：\n  - 需要迁移现有的openai-whisper集成\n  - API稍有不同，需要代码适配\n\n### 2. stable-ts库\n- **✅ 优势**：\n  - 专门为词级时间戳设计，准确性极高\n  - 与openai-whisper兼容性好\n  - 支持多种输出格式（SRT、VTT、ASS等）\n  - 提供置信度分数\n  - 支持音频预处理和降噪\n\n- **⚠️ 挑战**：\n  - 性能比faster-whisper慢\n  - 功能复杂，可能增加学习成本\n\n### 3. whisper-timestamped库\n- **✅ 优势**：\n  - 基于动态时间规整(DTW)，准确性高\n  - 支持置信度分数\n  - 与openai-whisper API兼容\n  - 支持多语言\n\n- **⚠️ 挑战**：\n  - 性能相对较慢\n  - 额外的计算开销\n\n## 推荐技术方案：faster-whisper\n\n基于性能、兼容性和长期维护考虑，**推荐使用faster-whisper作为主要方案**：\n\n1. **集成方式**：\n```python\nfrom faster_whisper import WhisperModel\n\nmodel = WhisperModel(\"medium\", device=\"cuda\", compute_type=\"float16\")\nsegments, info = model.transcribe(audio_file, word_timestamps=True)\n\nfor segment in segments:\n    for word in segment.words:\n        print(f\"[{word.start:.2f}s -> {word.end:.2f}s] {word.word}\")\n```\n\n2. **数据格式兼容性**：\n```python\n# faster-whisper输出格式\nword_data = {\n    \"start\": word.start,\n    \"end\": word.end, \n    \"text\": word.word,\n    \"confidence\": getattr(word, 'probability', 0.9)  # 如果有的话\n}\n```\n\n## 性能评估\n\n### 速度对比（基于网上基准测试）：\n- **openai-whisper**: 1x（基准）\n- **faster-whisper**: 2-4x更快\n- **stable-ts**: 0.5-0.8x（较慢但更准确）\n- **whisper-timestamped**: 0.8-1.2x\n\n### 精度评估：\n- **词级时间戳精度**: 通常在50-200毫秒范围内\n- **WER（词错误率）**: 与openai-whisper基本相当\n- **时间戳同步质量**: 足以满足前端音频播放器同步需求\n\n## 集成策略\n\n### 第一阶段：概念验证（1-2天）\n1. 安装faster-whisper并创建简单测试脚本\n2. 验证词级时间戳输出格式\n3. 测试与现有API的兼容性\n\n### 第二阶段：完整集成（3-5天）\n1. 修改backend/app/services/transcription.py\n2. 更新API响应格式包含词级时间戳\n3. 确保向后兼容性\n\n### 第三阶段：优化调试（2-3天）\n1. 性能优化和内存管理\n2. 错误处理和边界情况\n3. 与前端集成测试\n\n## 前端兼容性验证\n\n根据transcript-seeker分析，前端已经支持词级时间戳：\n```typescript\ninterface Word {\n  start_time: number;\n  end_time: number; \n  text: string;\n  confidence?: number;\n}\n```\n\n只需要调整API响应格式映射即可。\n\n## 风险评估：🟢 低风险\n\n- **技术风险**: 低 - 成熟的开源解决方案\n- **性能风险**: 低 - 经过大量基准测试验证\n- **兼容性风险**: 低 - API迁移相对简单\n- **维护风险**: 低 - active开源项目，社区支持好\n\n## 下一步行动建议\n\n1. **立即开始**: 创建faster-whisper概念验证\n2. **并行开发**: 开始修改transcription.py\n3. **测试优先**: 确保词级时间戳精度满足前端需求\n\n**结论：Whisper词级时间戳技术完全可行，推荐faster-whisper方案，风险可控。**\n</info added on 2025-06-19T12:01:52.994Z>",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Whisper Word-Level Timestamp Functionality",
+        "description": "Enhance the existing FastAPI backend to integrate Whisper's word-level timestamp feature, which is a critical and high-risk component of the project. This is part of Phase 1: Backend Engine Enhancement based on LocalAudioTran-LLM-Summar architecture.",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "1. Research and select appropriate Whisper model version:\n   - Investigate latest Whisper models with word-level timestamp support\n   - Evaluate performance and accuracy trade-offs for different model sizes\n\n2. Set up Whisper environment:\n   - Install required dependencies (e.g., PyTorch, transformers library)\n   - Download and cache the selected Whisper model\n\n3. Implement word-level transcription function:\n   - Create a new module (e.g., `whisper_transcription.py`)\n   - Define a function that accepts audio input and returns transcription with word-level timestamps\n   - Utilize Whisper's API to generate transcriptions with word timings\n   - Implement error handling and logging\n\n4. Optimize for performance:\n   - Implement batching for longer audio files\n   - Utilize GPU acceleration if available\n   - Consider implementing a caching mechanism for frequently processed audio\n\n5. Integrate with existing FastAPI backend:\n   - Modify `transcription.py` to use the new Whisper word-level timestamp function\n   - Update API endpoint to return word-level timestamp data\n   - Ensure compatibility with existing data structures and frontend expectations\n\n6. Implement fallback mechanism:\n   - Create a fallback solution using existing sentence-level timestamps if word-level fails\n   - Implement logic to detect and handle Whisper API failures or timeouts\n\n7. Update documentation:\n   - Document the new Whisper integration in the project's technical documentation\n   - Update API documentation to reflect new response format with word-level timestamps\n\n8. Containerization:\n   - Update Dockerfile to include new Whisper dependencies\n   - Optimize container size and build process for efficient deployment\n\n9. Ensure alignment with LocalAudioTran-LLM-Summar architecture:\n   - Verify that the implementation fits within the Phase 1 backend enhancement goals\n   - Ensure the word-level timestamp functionality properly interfaces with other components of the architecture",
+        "testStrategy": "1. Unit Testing:\n   - Write unit tests for the new Whisper transcription function\n   - Test with various audio inputs (different lengths, languages, qualities)\n   - Verify correct handling of edge cases (empty audio, very short/long audio)\n\n2. Integration Testing:\n   - Test the integration of Whisper functionality with existing FastAPI endpoints\n   - Verify correct response format and data structure\n   - Test error handling and fallback mechanisms\n\n3. Performance Testing:\n   - Measure transcription speed for various audio lengths\n   - Compare performance with and without GPU acceleration\n   - Stress test with concurrent requests to ensure stability\n\n4. Accuracy Testing:\n   - Compare word-level timestamp accuracy with ground truth data\n   - Evaluate timestamp precision across different audio types (clear speech, noisy environments, multiple speakers)\n\n5. API Testing:\n   - Use tools like Postman or curl to test the updated API endpoints\n   - Verify correct handling of different input formats and parameters\n\n6. Frontend Compatibility:\n   - Coordinate with frontend team to test integration with updated API responses\n   - Verify correct display and functionality of word-level timestamps in the UI\n\n7. Containerization Testing:\n   - Build and run Docker container with new Whisper integration\n   - Verify all dependencies are correctly installed and accessible\n\n8. Documentation Review:\n   - Verify accuracy and completeness of updated technical and API documentation\n\n9. Code Review:\n   - Conduct thorough code review to ensure best practices and optimization opportunities are addressed\n\n10. Architecture Alignment Testing:\n    - Verify that the implementation aligns with the LocalAudioTran-LLM-Summar architecture\n    - Test integration points with other Phase 1 backend components",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "实现Whisper词级时间戳功能",
+            "description": "研究并实现支持词级时间戳的Whisper库集成，修改transcription.py获取精确时间戳",
+            "details": "- 研究stable-ts、faster-whisper等支持词级时间戳的库\n- 选择最适合的库并测试性能和精度\n- 修改backend/app/services/transcription.py实现词级时间戳\n- 优化API返回格式包含详细时间戳数据\n- 验证时间戳精度满足前端音频同步需求",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 2,
+            "title": "PostgreSQL数据库集成",
+            "description": "在docker-compose.yml中添加PostgreSQL服务，创建数据模型并实现ORM集成",
+            "details": "- 在docker-compose.yml中配置PostgreSQL服务\n- 创建User、Meeting、ActionItem等核心数据模型\n- 实现SQLAlchemy ORM集成和数据库连接\n- 设计数据库迁移方案和初始化脚本\n- 配置数据库环境变量和连接池",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 3,
+            "title": "用户认证系统开发",
+            "description": "实现用户注册、登录API和JWT令牌认证机制",
+            "details": "- 创建用户注册和登录API端点\n- 实现JWT令牌生成和验证逻辑\n- 创建用户权限管理中间件\n- 实现密码加密和安全验证\n- 配置会话管理和令牌刷新机制",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 4,
+            "title": "会议处理API扩展",
+            "description": "扩展现有API支持数据库持久化，创建会议和待办事项管理端点",
+            "details": "- 扩展现有转录API支持数据库存储\n- 实现GET /meetings/{id}获取会议详情API\n- 实现PUT /action_items/{item_id}编辑待办事项API\n- 优化文件上传处理和存储方案\n- 实现会议列表和搜索功能API",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 5,
+            "title": "LocalAudioTran-LLM-Summar架构集成",
+            "description": "确保Whisper词级时间戳功能与整体后端架构正确集成",
+            "details": "- 审查LocalAudioTran-LLM-Summar架构文档\n- 确认词级时间戳功能与其他阶段一组件的接口兼容性\n- 调整实现以符合整体架构设计\n- 验证与LLM摘要组件的数据流通\n- 更新相关文档反映架构集成细节",
+            "status": "pending",
+            "dependencies": [
+              1
+            ],
+            "parentTaskId": 2
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Refactor Frontend to Remove External API Dependencies",
+        "description": "Refactor the transcript-seeker frontend to remove all external API dependencies (Gladia, AssemblyAI, etc.) and integrate with the local FastAPI backend.",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "1. Identify and remove external API dependencies:\n   - Locate all instances of external API calls in the codebase\n   - Remove imports and configurations related to external APIs\n   - Delete any unused components or utilities specific to external APIs\n\n2. Create a local API integration module:\n   - Develop a new module (e.g., `localApiService.ts`) to handle communication with the FastAPI backend\n   - Implement functions for audio upload, transcription requests, and retrieving results\n   - Ensure proper error handling and loading states\n\n3. Update state management:\n   - Modify Redux actions and reducers (or equivalent state management) to work with the local API\n   - Update any middleware or async logic to use the new local API integration module\n\n4. Refactor editable todo item interface:\n   - Implement a new component for editable todo items\n   - Add functionality for creating, editing, and deleting todo items\n   - Ensure changes are persisted through the local API\n\n5. Enhance audio-text timestamp synchronization:\n   - Update the audio player component to work with locally generated timestamps\n   - Implement precise synchronization between audio playback and text highlighting\n   - Add functionality to jump to specific timestamps in both audio and text\n\n6. Update UI components:\n   - Modify existing components to reflect the new local backend integration\n   - Update loading indicators and error messages to match the local API responses\n   - Ensure all UI elements are responsive and accessible\n\n7. Implement offline capabilities:\n   - Add service workers for offline caching of assets and API responses\n   - Implement queue system for operations performed while offline\n\n8. Security considerations:\n   - Implement proper CORS settings for communication with the local API\n   - Ensure any sensitive data is properly handled and not exposed in the frontend\n\n9. Performance optimization:\n   - Implement lazy loading for large transcripts\n   - Optimize rendering of long lists of timestamps and text\n\n10. Documentation:\n    - Update all relevant documentation to reflect the changes in the frontend architecture\n    - Provide clear instructions for setting up and running the frontend with the local backend",
+        "testStrategy": "1. Unit Testing:\n   - Write unit tests for the new localApiService module\n   - Test all CRUD operations for todo items\n   - Verify correct handling of API responses and errors\n\n2. Integration Testing:\n   - Test the integration between the frontend and the local FastAPI backend\n   - Verify successful audio upload, transcription, and retrieval of results\n   - Ensure proper synchronization between audio playback and text highlighting\n\n3. UI Testing:\n   - Use tools like React Testing Library to test UI components\n   - Verify that all UI elements respond correctly to user interactions\n   - Test accessibility features and keyboard navigation\n\n4. End-to-End Testing:\n   - Implement Cypress or similar E2E testing framework\n   - Create test scenarios that cover the entire user flow, from upload to transcription to editing\n   - Test offline capabilities by simulating network disconnections\n\n5. Performance Testing:\n   - Use browser developer tools to measure and optimize load times and rendering performance\n   - Test with large transcripts to ensure smooth scrolling and efficient memory usage\n\n6. Cross-browser Testing:\n   - Verify functionality and appearance across different browsers (Chrome, Firefox, Safari, Edge)\n   - Test on different devices and screen sizes to ensure responsive design\n\n7. Security Testing:\n   - Perform penetration testing to identify any security vulnerabilities\n   - Verify that all communication with the backend is properly secured\n\n8. Usability Testing:\n   - Conduct user testing sessions to gather feedback on the new interface and functionality\n   - Iterate on the design based on user feedback\n\n9. Regression Testing:\n   - Ensure that all existing features not directly related to API integration continue to function correctly\n   - Verify that the overall user experience has not been negatively impacted by the changes\n\n10. Documentation Review:\n    - Review and validate all updated documentation for accuracy and completeness\n    - Ensure that setup and running instructions are clear and can be followed by new developers",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "外部API依赖剥离",
+            "description": "识别并移除transcript-seeker中所有外部API调用和相关依赖",
+            "details": "- 全局搜索识别Gladia、AssemblyAI、OpenAI等外部API调用\n- 移除外部服务相关的配置文件和环境变量\n- 清理相关的npm依赖包\n- 保留核心UI组件和交互逻辑\n- 创建本地API接口的占位符",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 2,
+            "title": "本地API服务集成",
+            "description": "创建localApiService.ts连接本地FastAPI后端，实现完整的API调用逻辑",
+            "details": "- 创建src/services/localApiService.ts模块\n- 实现文件上传和会议处理API调用\n- 集成JWT令牌认证机制\n- 适配新的数据格式和响应结构\n- 实现错误处理和重试机制",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 3,
+            "title": "可编辑待办事项界面重构",
+            "description": "基于后端数据重新设计待办事项组件，实现实时编辑和保存功能",
+            "details": "- 重新设计待办事项列表组件\n- 实现行内编辑功能和输入验证\n- 集成实时保存和自动保存机制\n- 添加时间戳点击跳转功能\n- 实现待办事项的增删改操作",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 4,
+            "title": "音频-文字时间戳同步功能强化",
+            "description": "利用词级时间戳重构转录文本渲染，实现精确的点击跳转音频播放功能",
+            "details": "- 重构转录文本组件支持词级时间戳渲染\n- 实现每个词的可点击<span>元素\n- 优化音频播放器控制逻辑\n- 实现精确的时间戳同步跳转\n- 测试和优化同步精度和用户体验",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 3
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement User Authentication and Meeting History Interface",
+        "description": "完善用户流程、添加多语言支持、优化部署配置，实现完整的本地化AI会议助手。",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3
+        ],
+        "priority": "medium",
+        "details": "1. **用户认证系统**:\n   - 实现基于FastAPI的安全认证后端:\n     - 创建用户模型，包含用户名、邮箱、密码（哈希处理）和创建日期字段\n     - 使用SQLAlchemy ORM设置用户数据的数据库表\n     - 使用bcrypt或Passlib实现密码哈希处理\n     - 创建用户注册、登录和密码重置的API端点\n     - 实现基于JWT令牌的认证，具有适当的过期和刷新机制\n   - 开发前端认证组件:\n     - 创建带有用户名、邮箱和密码验证的注册表单\n     - 构建带有无效凭据错误处理的登录表单\n     - 使用React Router实现受保护路由\n     - 添加用户会话管理，在localStorage或cookies中存储令牌\n     - 创建带有基本账户管理选项的用户个人资料页面\n\n2. **会议历史界面**:\n   - 后端实现:\n     - 设计用于存储会议元数据的数据库模式（标题、日期、时长、语言）\n     - 创建用于列出、检索、更新和删除会议记录的API端点\n     - 实现会议历史的过滤和分页功能\n     - 添加用户和会议之间的关系，以实现适当的访问控制\n   - 前端实现:\n     - 创建具有排序选项的响应式会议历史列表组件\n     - 实现显示关键信息（标题、日期、时长）的会议卡片组件\n     - 添加按日期、标题或内容搜索和过滤功能\n     - 为每个会议创建详细视图，提供重播音频、查看转录和查看摘要的选项\n     - 实现会议记录的删除和导出功能\n\n3. **与现有组件集成**:\n   - 修改转录工作流程，将新转录与已登录用户关联\n   - 更新音频播放器组件以从会议历史加载\n   - 确保转录查看器和摘要组件与会议历史数据兼容\n   - 在整个应用程序中实现适当的错误处理和加载状态\n\n4. **安全考虑**:\n   - 实现CSRF保护\n   - 为认证端点添加速率限制\n   - 确保对所有用户输入进行适当验证\n   - 设置安全的HTTP头\n   - 实现适当的错误日志记录，不暴露敏感信息\n\n5. **多语言支持**:\n   - 实现界面的多语言支持系统\n   - 为用户认证和会议历史界面添加语言切换功能\n   - 确保所有用户提示和错误消息支持多种语言\n\n6. **本地部署优化**:\n   - 配置系统在本地服务器环境中的部署\n   - 优化性能和资源使用\n   - 实现简化的安装和配置流程",
+        "testStrategy": "1. **单元测试**:\n   - 测试用户模型和数据库操作:\n     - 验证用户创建、检索、更新和删除\n     - 测试密码哈希处理和验证\n     - 验证电子邮件唯一性约束\n   - 测试认证端点:\n     - 验证使用有效和无效数据的注册\n     - 测试使用正确和错误凭据的登录\n     - 验证JWT令牌生成和验证\n   - 测试会议历史API端点:\n     - 验证会议记录的CRUD操作\n     - 测试过滤和分页功能\n     - 验证用户特定数据隔离\n\n2. **集成测试**:\n   - 测试从注册到受保护路由访问的完整认证流程\n   - 验证会议创建并与正确用户关联\n   - 测试前端中的会议历史检索和显示\n   - 验证只有授权用户才能访问自己的会议数据\n\n3. **UI测试**:\n   - 测试注册和登录表单的表单验证\n   - 验证错误消息是否适当显示\n   - 测试会议历史界面的响应式设计\n   - 验证会议列表的排序、过滤和分页\n   - 测试会议列表和详细会议视图之间的导航\n\n4. **安全测试**:\n   - 对认证端点执行渗透测试\n   - 测试常见漏洞（SQL注入、XSS、CSRF）\n   - 验证令牌过期和刷新机制\n   - 测试速率限制功能\n\n5. **用户接受度测试**:\n   - 为典型用户工作流程创建测试场景:\n     - 新用户注册和首次会议记录\n     - 返回用户登录和访问以前的会议\n     - 搜索和过滤会议历史\n   - 收集关于认证和历史界面可用性的反馈\n\n6. **多语言和本地化测试**:\n   - 验证所有界面元素在不同语言设置下的正确显示\n   - 测试语言切换功能的有效性\n   - 确保所有错误消息和提示在所有支持的语言中正确显示\n\n7. **部署测试**:\n   - 在目标本地服务器环境中测试安装和配置流程\n   - 验证系统在本地环境中的性能和稳定性\n   - 测试系统资源使用情况和优化效果",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-06-19T11:29:50.153Z",
+      "description": "Default tasks context",
+      "updated": "2025-06-19T12:02:10.207Z"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+.vite/
+
+# Testing
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+
+# Auto-generated files
+*.d.ts
+.taskmaster/
+
+# Documentation
+CHANGELOG.md 

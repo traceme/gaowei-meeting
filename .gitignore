@@ -1,0 +1,35 @@
+# 依赖
+node_modules/
+.pnpm-debug.log*
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 构建输出
+dist/
+build/
+
+# 开发工具
+.vscode/
+.DS_Store
+*.log
+
+# 上传文件
+uploads/*.mp3
+uploads/*.wav
+uploads/*.aiff
+uploads/*.m4a
+!uploads/.gitkeep
+
+# 嵌入式项目(作为外部依赖)
+meeting-minutes/
+transcript-seeker/
+
+# 临时文件
+tmp/
+temp/
+docs/
