@@ -26,7 +26,7 @@ uploads/*.m4a
 !uploads/.gitkeep
 
 # 嵌入式项目(作为外部依赖)
-meeting-minutes/
+# meeting-minutes/
 transcript-seeker/
 
 # 临时文件
