@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Whisper C++ 转录服务
+  whisper-server:
+    build:
+      context: ./backend/whisper-custom
+      dockerfile: Dockerfile
+    ports:
+      - "8178:8178"
+    volumes:
+      - whisper_models:/app/models
+      - whisper_temp:/tmp/whisper_debug
+    environment:
+      - WHISPER_MODEL=ggml-base.en.bin
+      - WHISPER_THREADS=4
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8178/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - meeting-network
+
+  # 摘要服务器
+  summary-server:
+    build:
+      context: ./backend/summary-server
+      dockerfile: Dockerfile
+    ports:
+      - "5167:5167"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - DATABASE_URL=sqlite:///data/transcripts.db
+      - OLLAMA_URL=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      whisper-server:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - summary_data:/app/data
+    restart: unless-stopped
+    networks:
+      - meeting-network
+
+  # Ollama 本地 LLM 服务
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - meeting-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+
+  # 前端开发服务器（可选，推荐本地运行）
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3118:3118"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_WHISPER_URL=http://localhost:8178
+      - NEXT_PUBLIC_SUMMARY_URL=http://localhost:5167
+      - NEXT_PUBLIC_OLLAMA_URL=http://localhost:11434
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - whisper-server
+      - summary-server
+    networks:
+      - meeting-network
+    profiles:
+      - dev-frontend  # 使用 profile 使其可选
+
+volumes:
+  whisper_models:
+    driver: local
+  whisper_temp:
+    driver: local
+  summary_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  meeting-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,53 @@
+{
+  "name": "transcript-seeker",
+  "private": true,
+  "version": "1.0.0",
+  "homepage": "https://meetingbaas.com/",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9.12.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Meeting-Baas/transcript-seeker"
+  },
+  "description": "An open-source, browser-based transcript viewer and manager. Upload, transcribe, and chat with meeting recordings using AI. Features meeting bot integration, note-taking, and standalone mode.",
+  "license": "MIT",
+  "author": "Meeting-Baas",
+  "keywords": [
+    "meeting-bot",
+    "meetingbaas"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "git clean -xdf node_modules",
+    "clean:workspaces": "turbo run clean",
+    "db:generate": "turbo -F @meeting-baas/db generate-migrations",
+    "db:migrate": "turbo -F @meeting-baas/db migrate",
+    "db:studio": "turbo -F @meeting-baas/db studio",
+    "dev": "turbo watch dev --continue",
+    "dev:web": "turbo watch dev -F @meeting-baas/web...",
+    "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
+    "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
+    "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
+    "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
+    "lint:ws": "pnpm dlx sherif@latest",
+    "postinstall": "pnpm lint:ws",
+    "typecheck": "turbo run typecheck",
+    "ui-add": "turbo run ui-add"
+  },
+  "devDependencies": {
+    "@meeting-baas/shared": "workspace:*",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "cross-env": "^7.0.3",
+    "turbo": "^2.2.3",
+    "typescript": "^5.2.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@meeting-baas/shared": "workspace:*"
+    }
+  },
+  "packageManager": "pnpm@9.12.2"
+}

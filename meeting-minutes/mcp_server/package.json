@@ -1,0 +1,30 @@
+{
+  "name": "mcp-server-for-meeting-minutes",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A specialized MCP server to accelerate development on the meeting-minutes project.",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "build": "tsc"
+  },
+  "keywords": [
+    "ai",
+    "mcp",
+    "automation",
+    "development"
+  ],
+  "author": "Gemini AI Assistant",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.12.12",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.5"
+  }
+} 
