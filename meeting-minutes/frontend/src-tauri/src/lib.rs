@@ -651,28 +651,67 @@ async fn process_audio_file(args: AudioFileArgs) -> Result<AudioTranscriptResult
 
 // Helper function to convert stereo to mono
 fn stereo_to_mono(stereo: &[i16]) -> Vec<i16> {
-    let mut mono = Vec::with_capacity(stereo.len() / 2);
-    for chunk in stereo.chunks_exact(2) {
-        let left = chunk[0] as i32;
-        let right = chunk[1] as i32;
-        let combined = ((left + right) / 2) as i16;
-        mono.push(combined);
-    }
-    mono
+    stereo.iter().step_by(2).copied().collect()
 }
 
 pub fn run() {
-    log::set_max_level(log::LevelFilter::Info);
-    
     tauri::Builder::default()
-        .setup(|_app| {
-            log::info!("Application setup complete");
+        .setup(|app| {
+            // Check for whisper model
+            let model_path = app.path().app_data_dir().unwrap().join("whisper_model.bin");
+            if !model_path.exists() {
+                // Download the model if it doesn't exist
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    log::info!("Model not found, downloading...");
+                    let model_url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true";
+                    let response = reqwest::get(model_url).await.unwrap();
+                    let mut file = fs::File::create(&model_path).unwrap();
+                    let content = response.bytes().await.unwrap();
+                    std::io::copy(&mut content.as_ref(), &mut file).unwrap();
+                    log::info!("Model downloaded successfully");
+                    app_handle.restart();
+                });
+            } else {
+                let _app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // --- Start Python Backend ---
+                    // We now use a Python script as the backend to support features like Chinese conversion.
+                    let script_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("..") // out of src-tauri
+                        .join("..") // out of frontend
+                        .join("backend")
+                        .join("whisper-custom")
+                        .join("app.py");
 
-            // Trigger microphone permission request on startup
-            if let Err(e) = audio::core::trigger_audio_permission() {
-                log::error!("Failed to trigger audio permission: {}", e);
+                    if !script_path.exists() {
+                        log_error!("Python backend script not found at: {:?}", script_path);
+                        return;
+                    }
+
+                    log_info!("Starting Python backend: python3 {}", script_path.to_str().unwrap());
+
+                    // Start the python script as a sidecar process.
+                    let (mut rx, _child) = tauri::api::process::Command::new("python3")
+                        .args(&[
+                            script_path.to_str().unwrap(),
+                            "--port", "8178",
+                            "--model-path", model_path.to_str().unwrap(),
+                        ])
+                        .spawn()
+                        .expect("Failed to spawn Python backend. Is `python3` in your PATH and have you installed dependencies from requirements.txt?");
+
+                    // Log output from the python script for debugging.
+                    while let Some(event) = rx.recv().await {
+                        if let tauri::api::process::CommandEvent::Stdout(line) = event {
+                            log_info!("[python-backend] {}", line);
+                        }
+                        if let tauri::api::process::CommandEvent::Stderr(line) = event {
+                            log_error!("[python-backend-error] {}", line);
+                        }
+                    }
+                });
             }
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -681,13 +720,17 @@ pub fn run() {
             is_recording,
             read_audio_file,
             save_transcript,
-            process_audio_file
+            process_audio_file,
+            get_ollama_models,
+            generate_summary,
+            stereo_to_mono,
+            resample_audio,
+            encode_single_audio_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-// Helper function to resample audio
 fn resample_audio(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     if from_rate == to_rate {
         return samples.to_vec();
