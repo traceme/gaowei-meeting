@@ -10,6 +10,11 @@ const UploadPage = () => {
   const [currentTask, setCurrentTask] = useState<TranscriptionTask | null>(null)
   const [transcriptionResult, setTranscriptionResult] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // 新增：转录时间相关状态
+  const [transcriptionStartTime, setTranscriptionStartTime] = useState<number | null>(null)
+  const [audioDuration, setAudioDuration] = useState<number | null>(null)
+  const lastEstimatedTimeRef = useRef<number | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -43,10 +48,38 @@ const UploadPage = () => {
       )
     )
     setSelectedFiles(prev => [...prev, ...audioFiles])
+    
+    // 获取第一个音频文件的时长
+    if (audioFiles.length > 0) {
+      getAudioDuration(audioFiles[0])
+    }
+  }
+
+  // 获取音频文件时长
+  const getAudioDuration = (file: File) => {
+    const audio = new Audio()
+    const url = URL.createObjectURL(file)
+    
+    audio.addEventListener('loadedmetadata', () => {
+      setAudioDuration(audio.duration)
+      URL.revokeObjectURL(url) // 清理内存
+    })
+    
+    audio.addEventListener('error', () => {
+      console.log('无法获取音频时长，使用默认估算')
+      setAudioDuration(null)
+      URL.revokeObjectURL(url)
+    })
+    
+    audio.src = url
   }
 
   const removeFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+    // 如果移除了当前的音频文件，清理音频时长
+    if (index === 0) {
+      setAudioDuration(null)
+    }
   }
 
   const handleUpload = async () => {
@@ -63,7 +96,7 @@ const UploadPage = () => {
       formData.append('audio', file)
       
       // 上传文件到后端API
-      const response = await fetch('http://localhost:3002/api/transcribe', {
+      const response = await fetch('http://localhost:3001/api/transcribe', {
         method: 'POST',
         body: formData,
       })
@@ -84,6 +117,10 @@ const UploadPage = () => {
         createdAt: new Date().toISOString(),
       })
       
+      // 记录转录开始时间
+      setTranscriptionStartTime(Date.now())
+      lastEstimatedTimeRef.current = null // 重置预计时间追踪
+      
       // 开始轮询转录状态
       pollTranscriptionStatus(result.taskId)
       
@@ -97,11 +134,11 @@ const UploadPage = () => {
   
   const pollTranscriptionStatus = async (taskId: string) => {
     let attempts = 0
-    const maxAttempts = 60 // 最多轮询1分钟
+    const maxAttempts = 30000 // 最多轮询500分钟（对于大文件转录需要更长时间）
     
     const poll = async () => {
       try {
-        const response = await fetch(`http://localhost:3002/api/transcribe/${taskId}`)
+        const response = await fetch(`http://localhost:3001/api/transcribe/${taskId}`)
         
         if (!response.ok) {
           throw new Error('获取任务状态失败')
@@ -145,9 +182,16 @@ const UploadPage = () => {
         if (attempts < maxAttempts) {
           setTimeout(poll, 1000) // 每秒轮询一次
         } else {
-          alert('转录超时，请稍后手动刷新页面查看结果')
+          console.log('转录处理时间较长，继续后台处理...')
           setIsUploading(false)
           setUploadProgress(null)
+          // 显示友好提示而不是弹窗
+          setCurrentTask(prev => prev ? {
+            ...prev,
+            status: 'processing',
+            progress: 99,
+            // 添加一个提示信息
+          } : null)
         }
         
       } catch (error) {
@@ -156,15 +200,144 @@ const UploadPage = () => {
         if (attempts < maxAttempts) {
           setTimeout(poll, 2000) // 出错时延长轮询间隔
         } else {
-          alert('无法获取转录状态，请稍后手动刷新页面')
+          console.error('无法获取转录状态，停止轮询')
           setIsUploading(false)
           setUploadProgress(null)
+          setCurrentTask(prev => prev ? {
+            ...prev,
+            status: 'error',
+            error: '网络连接问题，请检查服务器状态'
+          } : null)
         }
       }
     }
     
     // 开始轮询
     setTimeout(poll, 1000)
+  }
+
+  // 智能计算预计剩余时间 - 稳定递减算法
+  const calculateEstimatedTime = (currentProgress: number) => {
+    if (!transcriptionStartTime) return { timeEstimate: '计算中...', rawSeconds: 0 }
+    
+    const now = Date.now()
+    const elapsedSeconds = Math.floor((now - transcriptionStartTime) / 1000)
+    
+    // 如果进度小于5%，可能还在初始化阶段
+    if (currentProgress < 5) {
+      return { timeEstimate: '初始化中...', rawSeconds: 0 }
+    }
+    
+    const progressRatio = currentProgress / 100
+    let finalEstimateSeconds = 0
+    
+    // 基于音频时长的基准估算
+    let audioBasedEstimate = 0
+    if (audioDuration) {
+      const audioMinutes = audioDuration / 60
+      let estimatedTranscriptionRatio = 1.0
+      
+      // 根据音频时长和模型（现在用的是 latest，较慢）调整比例
+      if (audioMinutes <= 10) {
+        estimatedTranscriptionRatio = 0.8  // 短音频：约0.8倍音频时长
+      } else if (audioMinutes <= 30) {
+        estimatedTranscriptionRatio = 1.2  // 中等音频：约1.2倍音频时长  
+      } else if (audioMinutes <= 60) {
+        estimatedTranscriptionRatio = 1.8  // 长音频：约1.8倍音频时长
+      } else if (audioMinutes <= 120) {
+        estimatedTranscriptionRatio = 2.5  // 超长音频：约2.5倍音频时长
+      } else {
+        estimatedTranscriptionRatio = 3.2  // 特长音频：约3.2倍音频时长
+      }
+      
+      const totalEstimatedSeconds = audioDuration * estimatedTranscriptionRatio
+      audioBasedEstimate = Math.max(0, totalEstimatedSeconds - elapsedSeconds)
+    }
+    
+    // 基于实际进度速度的估算（但要稳定化处理）
+    let progressBasedEstimate = 0
+    if (progressRatio > 0.05) {
+      // 计算最近的进度速度（而不是总体平均速度）
+      const currentProgressSpeed = progressRatio / elapsedSeconds // 每秒进度
+      
+      // 限制进度速度变化，避免剧烈波动
+      const minSpeed = 0.0001 // 最小进度速度（防止除零错误）
+      const maxSpeed = 0.01   // 最大进度速度（防止过于乐观）
+      const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, currentProgressSpeed))
+      
+      const remainingProgress = 1 - progressRatio
+      progressBasedEstimate = remainingProgress / constrainedSpeed
+    }
+    
+    // 权重组合两种估算方法
+    if (audioBasedEstimate > 0 && progressBasedEstimate > 0) {
+      // 早期更依赖音频时长，后期更依赖实际进度
+      const audioWeight = Math.max(0.3, 1 - progressRatio * 2) // 进度越高，音频权重越低
+      const progressWeight = 1 - audioWeight
+      
+      finalEstimateSeconds = (audioBasedEstimate * audioWeight) + (progressBasedEstimate * progressWeight)
+    } else if (audioBasedEstimate > 0) {
+      finalEstimateSeconds = audioBasedEstimate
+    } else if (progressBasedEstimate > 0) {
+      finalEstimateSeconds = progressBasedEstimate
+    } else {
+      return { timeEstimate: '正在分析音频...', rawSeconds: 0 }
+    }
+    
+    // 强制递减策略：确保预计时间只能减少或小幅增加
+    if (lastEstimatedTimeRef.current !== null) {
+      const lastEstimate = lastEstimatedTimeRef.current
+      
+      // 如果新估算比上次大，则使用渐进递减
+      if (finalEstimateSeconds > lastEstimate) {
+        // 最多允许增加5%，否则强制递减2%
+        const maxIncrease = lastEstimate * 1.05
+        if (finalEstimateSeconds > maxIncrease) {
+          finalEstimateSeconds = lastEstimate * 0.98 // 强制递减2%
+        }
+      } else {
+        // 新估算更小，但不能递减太快（避免突然跳变）
+        const minDecrease = lastEstimate * 0.9 // 最多一次递减10%
+        finalEstimateSeconds = Math.max(minDecrease, finalEstimateSeconds)
+      }
+    }
+    
+    // 更新最后的预计时间到 ref
+    lastEstimatedTimeRef.current = finalEstimateSeconds
+    
+    // 调试信息（可在控制台查看）
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⏱️ 时间估算调试:', {
+        进度: `${currentProgress.toFixed(1)}%`,
+        已用时间: `${elapsedSeconds}秒`,
+        音频预估: audioBasedEstimate ? `${Math.round(audioBasedEstimate)}秒` : '无',
+        进度预估: progressBasedEstimate ? `${Math.round(progressBasedEstimate)}秒` : '无',
+        最终预估: `${Math.round(finalEstimateSeconds)}秒`,
+        上次预估: lastEstimatedTimeRef.current !== null ? `${Math.round(lastEstimatedTimeRef.current)}秒` : '无'
+      })
+    }
+    
+    return { 
+      timeEstimate: formatTimeEstimate(Math.max(0, finalEstimateSeconds)), 
+      rawSeconds: finalEstimateSeconds 
+    }
+  }
+
+  // 格式化时间估算显示
+  const formatTimeEstimate = (seconds: number) => {
+    if (seconds < 60) {
+      return `约 ${Math.ceil(seconds)} 秒`
+    } else if (seconds < 3600) {
+      const minutes = Math.ceil(seconds / 60)
+      return `约 ${minutes} 分钟`
+    } else {
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.ceil((seconds % 3600) / 60)
+      if (minutes === 0) {
+        return `约 ${hours} 小时`
+      }
+      return `约 ${hours} 小时 ${minutes} 分钟`
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -260,22 +433,22 @@ const UploadPage = () => {
       )}
 
       {/* 上传进度 */}
-      {isUploading && uploadProgress !== null && (
+      {isUploading && uploadProgress !== null && !currentTask && (
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">上传进度</h3>
+            <h3 className="text-lg font-semibold text-gray-900">📤 文件上传进度</h3>
             <span className="text-sm text-gray-600">
               {Math.round(uploadProgress)}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div
-              className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+              className="bg-green-600 h-3 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            正在上传文件，请稍候...
+            正在上传文件到服务器，请稍候...
           </p>
         </div>
       )}
@@ -341,7 +514,7 @@ const UploadPage = () => {
                 {/* 转录阶段指示器 */}
                 <div className="mb-4">
                   <div className="flex justify-between text-xs text-gray-500 mb-2">
-                    <span>文件上传</span>
+                    <span>文件处理</span>
                     <span>音频分析</span>
                     <span>语音识别</span>
                     <span>文本处理</span>
@@ -354,16 +527,25 @@ const UploadPage = () => {
                       { min: 30, max: 70, label: '🎙️', desc: '语音识别', color: 'bg-purple-500' },
                       { min: 70, max: 90, label: '📝', desc: '文本处理', color: 'bg-orange-500' },
                       { min: 90, max: 100, label: '✅', desc: '完成', color: 'bg-green-500' }
-                    ].map((stage, index) => (
-                      <div key={index} className="flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm transition-all duration-300 ${
-                          currentTask.progress >= stage.min ? stage.color : 'bg-gray-300'
-                        } ${currentTask.progress >= stage.min && currentTask.progress < stage.max ? 'animate-pulse scale-110 ring-2 ring-offset-2 ring-blue-300' : ''}`}>
-                          {stage.label}
+                    ].map((stage, index) => {
+                      const isActive = currentTask.progress >= stage.min
+                      const isCurrent = currentTask.progress >= stage.min && currentTask.progress < stage.max
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm transition-all duration-300 ${
+                            isActive ? stage.color : 'bg-gray-300'
+                          } ${isCurrent ? 'animate-pulse scale-110 ring-2 ring-offset-2 ring-blue-300' : ''}`}>
+                            {stage.label}
+                          </div>
+                          <span className={`text-xs mt-1 text-center transition-colors duration-300 ${
+                            isCurrent ? 'text-blue-600 font-medium' : 'text-gray-500'
+                          }`}>
+                            {stage.desc}
+                          </span>
                         </div>
-                        <span className="text-xs text-gray-500 mt-1 text-center">{stage.desc}</span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -371,15 +553,26 @@ const UploadPage = () => {
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <div className="text-sm font-medium text-blue-900 mb-2">
                     当前阶段: {
-                      currentTask.progress < 10 ? '📁 文件处理中...' :
-                      currentTask.progress < 30 ? '🎵 音频格式分析...' :
-                      currentTask.progress < 70 ? '🎙️ 语音识别进行中...' :
-                      currentTask.progress < 90 ? '📝 文本后处理...' :
-                      '✅ 即将完成...'
+                      // 优先使用后端提供的文本描述
+                      currentTask.progress_text || (
+                        typeof currentTask.progress === 'number' ? (
+                          currentTask.progress < 10 ? '📁 文件处理中...' :
+                          currentTask.progress < 30 ? '🎵 音频格式分析...' :
+                          currentTask.progress < 70 ? '🎙️ 语音识别进行中...' :
+                          currentTask.progress < 90 ? '📝 文本后处理...' :
+                          currentTask.progress >= 99 ? '⏰ 大文件处理中，请耐心等待...' :
+                          '✅ 即将完成...'
+                        ) : '🔄 处理中...'
+                      )
                     }
                   </div>
                   <div className="text-xs text-gray-600">
-                    预计剩余时间: {currentTask.progress < 100 ? `约 ${Math.max(1, Math.round((100 - currentTask.progress) / 10))} 秒` : '即将完成'}
+                    {(typeof currentTask.progress === 'number' && currentTask.progress >= 99) ? 
+                      '大文件转录需要更长时间，页面可安全关闭，结果会保存在历史记录中' :
+                      `预计剩余时间: ${calculateEstimatedTime(
+                        typeof currentTask.progress === 'number' ? currentTask.progress : 0
+                      ).timeEstimate}`
+                    }
                   </div>
                 </div>
               </div>
@@ -396,6 +589,14 @@ const UploadPage = () => {
                   <span className="text-gray-500">任务ID:</span>
                   <span className="font-mono text-xs text-gray-600">{currentTask.id}</span>
                 </div>
+                {audioDuration && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">音频时长:</span>
+                    <span className="font-medium text-blue-600">
+                      {Math.floor(audioDuration / 3600)}:{String(Math.floor((audioDuration % 3600) / 60)).padStart(2, '0')}:{String(Math.floor(audioDuration % 60)).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -408,6 +609,14 @@ const UploadPage = () => {
                     <span className="text-green-600 font-medium flex items-center">
                       <div className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></div>
                       本地 Whisper
+                    </span>
+                  </div>
+                )}
+                {transcriptionStartTime && currentTask.status === 'processing' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">已用时间:</span>
+                    <span className="text-gray-700">
+                      {Math.floor((Date.now() - transcriptionStartTime) / 1000)} 秒
                     </span>
                   </div>
                 )}
@@ -481,7 +690,7 @@ const UploadPage = () => {
               <audio 
                 controls 
                 className="w-full"
-                src={`http://localhost:3002/uploads/${currentTask.filename}`}
+                src={`http://localhost:3001/uploads/${currentTask.filename}`}
               >
                 您的浏览器不支持音频播放。
               </audio>
@@ -739,7 +948,7 @@ const UploadPage = () => {
                 
                 try {
                   // 检查AI服务状态
-                  const statusResponse = await fetch('http://localhost:3002/api/ai/status');
+                  const statusResponse = await fetch('http://localhost:3001/api/ai/status');
                   const statusData = await statusResponse.json();
                   
                   if (!statusData.available) {
@@ -764,7 +973,7 @@ const UploadPage = () => {
                   }
                   
                   // 调用AI摘要API
-                  const summaryResponse = await fetch('http://localhost:3002/api/ai/summary', {
+                  const summaryResponse = await fetch('http://localhost:3001/api/ai/summary', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

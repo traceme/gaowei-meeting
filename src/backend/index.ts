@@ -17,12 +17,12 @@ const transcriptionRouter = new TranscriptionRouter();
 
 // AI服务配置
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama3.2:latest';
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama3.2:1b';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CLAUDE_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 // AI服务超时配置
-const AI_TIMEOUT_MS = 30000; // 30秒超时
+const AI_TIMEOUT_MS = 1800000; // 增加到 30 分钟超时
 
 // Ollama工具函数
 async function isOllamaAvailable(): Promise<boolean> {
@@ -40,7 +40,8 @@ async function isOllamaAvailable(): Promise<boolean> {
 
 // 智能AI摘要生成服务（支持多提供商容错）
 async function generateAISummary(transcriptText: string, model = DEFAULT_MODEL): Promise<string> {
-  const prompt = `请对以下会议转录内容进行智能摘要，提取关键要点、决策和行动项：
+  const prompt = `请对以下会议转录内容进行智能摘要，提取关键要点、决策和行动项。
+请严格使用简体中文回答，不要使用繁体中文字符。
 
 转录内容：
 "${transcriptText}"
@@ -67,7 +68,7 @@ async function generateAISummary(transcriptText: string, model = DEFAULT_MODEL):
 - 主要参与者：[从内容推断]
 - 讨论主题：[主要话题]
 
-请用简洁明了的中文回答，重点突出最重要的信息。`;
+请用简洁明了的简体中文回答，重点突出最重要的信息。`;
 
   // 尝试多个AI服务提供商，按优先级顺序
   const providers = [
@@ -116,7 +117,7 @@ async function generateOllamaSummary(prompt: string, model: string): Promise<str
     options: {
       temperature: 0.7,
       top_p: 0.9,
-      max_tokens: 1000,
+      num_predict: 1000, // 使用 Ollama 支持的参数名
     },
   };
 
@@ -657,3 +658,4 @@ process.on('SIGINT', () => {
   console.log('\n🛑 收到关闭信号，正在优雅关闭服务...');
   process.exit(0);
 });
+ 

@@ -6,7 +6,7 @@ import './App.css'
 
 // 懒加载页面组件
 const HomePage = lazy(() => import('./pages/HomePage'))
-const UploadPage = lazy(() => import('./pages/UploadPageSimplified'))
+const UploadPage = lazy(() => import('./pages/UploadPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
