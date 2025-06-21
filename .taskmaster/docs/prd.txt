@@ -1,0 +1,179 @@
+# 高维会议AI项目重构 - 产品需求文档 (PRD)
+
+## 项目背景
+
+高维会议AI项目当前存在严重的代码冗余问题，包含三个独立的子项目：
+1. gaowei-meeting-ai/src - 主要的React + TypeScript + Vite + Express项目，功能最完整
+2. meeting-minutes - Python FastAPI + Next.js + Tauri项目，有完整的whisper.cpp集成
+3. transcript-seeker - 现代化的monorepo架构，使用turbo + pnpm workspace
+
+这些项目之间存在大量重复代码和功能冗余，导致维护困难。当前状态不是一个有机的整体，而是三个独立的房子被圈在一起。
+
+## 重构目标
+
+将三个独立项目整合为统一的Monorepo架构，消除代码冗余，建立清晰可维护的项目结构。
+
+### 目标架构
+
+```
+gaowei-meeting-ai/
+├── package.json          # 根package.json，管理整个工作区
+├── pnpm-workspace.yaml   # pnpm工作区配置文件
+├── tsconfig.base.json    # 基础的TypeScript配置
+│
+└── packages/             # 所有的代码都存在于这里，作为独立的包
+    │
+    ├── api/              # 统一的后端服务
+    │   ├── package.json
+    │   └── src/
+    │
+    ├── web/              # 统一的前端应用
+    │   ├── package.json
+    │   └── src/
+    │
+    ├── ui/               # 共享的UI组件库
+    │   ├── package.json
+    │   └── src/
+    │
+    ├── shared-types/     # 共享的TypeScript类型
+    │   ├── package.json
+    │   └── index.ts
+    │
+    └── whisper-engine/   # 独立的、可复用的转录引擎服务
+        ├── package.json
+        └── ...
+```
+
+## 功能需求
+
+### 核心功能保留
+- 音频转录功能（基于whisper.cpp）
+- 多AI提供商容错机制
+- 智能会议摘要生成
+- 音频播放控制
+- 会议记录管理
+- 现代化的React UI界面
+
+### 新增功能
+- 统一的依赖管理
+- 共享的UI组件库
+- 集中的类型定义
+- 统一的构建流程
+- 改进的开发体验
+
+## 技术规范
+
+### 技术栈
+- **前端**: React 18+, TypeScript, Vite
+- **后端**: Node.js, Express, TypeScript
+- **Monorepo管理**: pnpm workspace
+- **UI组件**: 基于现有VidstackAudioPlayer等组件
+- **转录引擎**: whisper.cpp (从meeting-minutes项目迁移)
+- **构建工具**: Vite, tsc
+
+### 包管理
+- 使用pnpm workspace进行monorepo管理
+- 内部包使用workspace:*协议进行依赖
+- 统一的TypeScript配置继承
+
+## 详细需求
+
+### 1. 建立Monorepo基础
+- 创建pnpm workspace配置
+- 建立packages目录结构
+- 配置根级package.json
+- 建立共享的TypeScript配置
+
+### 2. 迁移核心资产
+- 将gaowei-meeting-ai/src/backend迁移到packages/api
+- 将gaowei-meeting-ai/src/frontend迁移到packages/web
+- 提取共享UI组件到packages/ui
+- 提取共享类型到packages/shared-types
+
+### 3. 整合whisper引擎
+- 从meeting-minutes项目提取whisper.cpp集成
+- 创建独立的whisper-engine包
+- 保持API兼容性
+
+### 4. 更新依赖关系
+- 配置包间依赖关系
+- 更新所有import语句
+- 重新安装和链接依赖
+
+### 5. 清理冗余代码
+- 删除meeting-minutes目录
+- 删除transcript-seeker目录
+- 删除原始src目录
+- 清理重复的配置文件
+
+## 验收标准
+
+### 功能性验收
+- 所有原有功能正常工作
+- 音频转录功能完整
+- 前端界面完全可用
+- API接口正常响应
+
+### 技术性验收
+- 所有包可以独立构建
+- pnpm workspace正常工作
+- 内部包依赖正确解析
+- TypeScript类型检查通过
+
+### 性能验收
+- 构建时间不超过原有时间的120%
+- 运行时性能不低于原有性能
+- 包大小优化，消除重复依赖
+
+## 项目里程碑
+
+### 阶段1: 基础设施建设 (1-2天)
+- 建立monorepo基础结构
+- 配置pnpm workspace
+- 创建共享配置
+
+### 阶段2: 核心迁移 (3-5天)
+- 迁移后端API服务
+- 迁移前端应用
+- 提取共享组件和类型
+
+### 阶段3: 引擎整合 (2-3天)
+- 集成whisper转录引擎
+- 测试转录功能
+- 优化性能
+
+### 阶段4: 清理和优化 (1-2天)
+- 删除冗余代码
+- 优化构建流程
+- 最终测试和验证
+
+## 风险评估
+
+### 高风险
+- 转录引擎迁移可能出现兼容性问题
+- 依赖版本冲突
+- 功能丢失风险
+
+### 中风险
+- 构建流程复杂性增加
+- 开发体验临时下降
+
+### 低风险
+- 文档更新需求
+- 部署流程调整
+
+## 成功指标
+
+- 代码量减少30%以上
+- 构建时间优化
+- 开发体验提升
+- 功能完整性100%保持
+- 零功能丢失
+
+## 后续计划
+
+重构完成后，将为后续功能开发提供：
+- 更好的代码复用性
+- 更清晰的项目结构
+- 更高效的开发体验
+- 更容易的维护成本 

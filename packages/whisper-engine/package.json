@@ -1,0 +1,31 @@
+{
+  "name": "@gaowei/whisper-engine",
+  "version": "1.0.0",
+  "description": "高维会议AI Whisper转录引擎",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "start:python": "python src/python/app.py",
+    "install:python": "pip install -r src/python/requirements.txt"
+  },
+  "dependencies": {
+    "@gaowei/shared-types": "workspace:*",
+    "axios": "^1.6.0",
+    "child_process": "^1.0.2",
+    "form-data": "^4.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "src/python"
+  ]
+} 

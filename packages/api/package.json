@@ -1,0 +1,53 @@
+{
+  "name": "@gaowei/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gaowei/shared-types": "workspace:*",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.2",
+    "dotenv": "^16.4.7",
+    "form-data": "^4.0.1",
+    "openai": "^4.77.3",
+    "axios": "^1.7.9",
+    "better-sqlite3": "^11.6.0"
+  },
+  "devDependencies": {
+    "@gaowei/typescript-config": "*",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "tsup": "^8.3.5"
+  },
+  "tsup": {
+    "entry": ["src/index.ts"],
+    "format": ["cjs", "esm"],
+    "target": "es2022",
+    "outDir": "dist",
+    "clean": true,
+    "splitting": false,
+    "sourcemap": true,
+    "dts": true,
+    "external": ["express"]
+  }
+} 

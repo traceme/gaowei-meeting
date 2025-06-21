@@ -1,0 +1,16 @@
+{
+  "name": "@gaowei/typescript-config",
+  "version": "1.0.0",
+  "description": "共享TypeScript配置",
+  "main": "index.js",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "files": [
+    "base.json",
+    "nextjs.json",
+    "react-library.json",
+    "vite.json"
+  ]
+} 

@@ -1,0 +1,13 @@
+packages:
+  # 核心应用包
+  - "packages/api"          # 统一后端服务
+  - "packages/web"          # 统一前端应用
+  - "packages/ui"           # 共享UI组件库
+  - "packages/shared-types" # 共享类型定义
+  - "packages/whisper-engine" # 独立转录引擎
+  
+  # 工具包
+  - "tooling/*"
+  
+  # 应用
+  - "apps/*" 
