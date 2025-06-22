@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 interface TranscriptionTask {
   id: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
+  meeting_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'failed';
   filename: string;
   progress: number;
   result?: {
@@ -13,9 +14,23 @@ interface TranscriptionTask {
       text: string;
     }>;
     language: string;
+    duration: number;
+    model: string;
   };
   error?: string;
-  createdAt: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TasksApiResponse {
+  success: boolean;
+  data: {
+    tasks: TranscriptionTask[];
+    total: number;
+    limit: number;
+    offset: number;
+  };
+  timestamp: string;
 }
 
 const HistoryPage: React.FC = () => {
@@ -36,55 +51,73 @@ const HistoryPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:3000/api/tasks');
-      const data = await response.json();
-      setTasks(data.tasks || []);
+      const apiResponse: TasksApiResponse = await response.json();
+      
+      if (apiResponse.success && apiResponse.data.tasks) {
+        setTasks(apiResponse.data.tasks);
+      } else {
+        console.error('API响应格式不正确:', apiResponse);
+        setTasks([]);
+      }
     } catch (error) {
       console.error('获取历史记录失败:', error);
       // 使用模拟数据作为后备
       setTasks([
         {
           id: '1',
+          meeting_id: 'meeting_1',
           filename: '产品会议-2024-01-15.mp3',
           status: 'completed',
           progress: 100,
-          createdAt: '2024-01-15T10:30:00Z',
+          created_at: '2024-01-15T10:30:00Z',
+          updated_at: '2024-01-15T10:35:00Z',
           result: {
             text: '今天我们讨论一下新产品的核心功能设计，主要包括用户界面的优化...',
             segments: [
               { start: 0, end: 10, text: '今天我们讨论一下新产品的核心功能设计' },
               { start: 10, end: 20, text: '主要包括用户界面的优化' }
             ],
-            language: 'zh-CN'
+            language: 'zh-CN',
+            duration: 20,
+            model: 'small'
           }
         },
         {
           id: '2',
+          meeting_id: 'meeting_2',
           filename: '客户访谈-张总.wav',
           status: 'completed',
           progress: 100,
-          createdAt: '2024-01-14T15:20:00Z',
+          created_at: '2024-01-14T15:20:00Z',
+          updated_at: '2024-01-14T15:25:00Z',
           result: {
             text: '非常感谢您抽时间参与我们的产品访谈，请先介绍一下您的公司背景...',
             segments: [
               { start: 0, end: 15, text: '非常感谢您抽时间参与我们的产品访谈' },
               { start: 15, end: 30, text: '请先介绍一下您的公司背景' }
             ],
-            language: 'zh-CN'
+            language: 'zh-CN',
+            duration: 30,
+            model: 'small'
           }
         },
         {
           id: '3',
+          meeting_id: 'meeting_3',
           filename: 'team-standup-meeting.mp3',
           status: 'processing',
           progress: 75,
-          createdAt: '2024-01-15T09:00:00Z'
+          created_at: '2024-01-15T09:00:00Z',
+          updated_at: '2024-01-15T09:05:00Z'
         },
         {
           id: '4',
+          meeting_id: 'meeting_4',
           filename: '销售培训课程.m4a',
           status: 'error',
           progress: 0,
-          createdAt: '2024-01-13T14:10:00Z',
+          created_at: '2024-01-13T14:10:00Z',
+          updated_at: '2024-01-13T14:10:00Z',
           error: '文件格式不支持'
         }
       ]);
@@ -96,8 +129,9 @@ const HistoryPage: React.FC = () => {
   // 过滤和排序任务
   const filteredAndSortedTasks = tasks
     .filter(task => {
-      // 状态过滤
-      if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+      // 状态过滤 - 将failed映射为error
+      const normalizedStatus = task.status === 'failed' ? 'error' : task.status;
+      if (statusFilter !== 'all' && normalizedStatus !== statusFilter) return false;
       
       // 搜索过滤
       if (searchTerm) {
@@ -116,7 +150,7 @@ const HistoryPage: React.FC = () => {
       
       switch (sortBy) {
         case 'date':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
         case 'filename':
           comparison = a.filename.localeCompare(b.filename);
@@ -148,27 +182,200 @@ const HistoryPage: React.FC = () => {
     }
   };
 
-  // 批量删除（模拟）
-  const handleBatchDelete = () => {
+  // 批量删除
+  const handleBatchDelete = async () => {
     if (selectedTasks.size === 0) return;
     
-    if (confirm(`确定要删除选中的 ${selectedTasks.size} 个任务吗？`)) {
+    if (!confirm(`确定要删除选中的 ${selectedTasks.size} 个任务吗？此操作不可撤销。`)) return;
+
+    try {
       console.log('批量删除任务:', Array.from(selectedTasks));
-      // 这里应该调用API删除
-      setTasks(prev => prev.filter(task => !selectedTasks.has(task.id)));
-      setSelectedTasks(new Set());
-      alert('选中的任务已删除');
+      
+      // 并行删除所有选中的任务
+      const deletePromises = Array.from(selectedTasks).map(async (taskId) => {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'DELETE',
+        });
+        const result = await response.json();
+        return { taskId, success: result.success, error: result.error };
+      });
+      
+      const results = await Promise.all(deletePromises);
+      
+      // 统计成功和失败的数量
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      // 从本地状态中移除成功删除的任务
+      if (successful.length > 0) {
+        const successfulIds = new Set(successful.map(r => r.taskId));
+        setTasks(prev => prev.filter(task => !successfulIds.has(task.id)));
+        setSelectedTasks(new Set());
+      }
+      
+      // 显示结果信息
+      if (failed.length === 0) {
+        alert(`成功删除 ${successful.length} 个任务`);
+      } else {
+        alert(`成功删除 ${successful.length} 个任务，失败 ${failed.length} 个任务\n\n失败原因：\n${failed.map(f => `任务 ${f.taskId}: ${f.error}`).join('\n')}`);
+      }
+    } catch (error) {
+      console.error('批量删除任务失败:', error);
+      alert('批量删除失败，请检查网络连接后重试');
+    }
+  };
+
+  // 查看任务详情
+  const handleViewDetails = (task: TranscriptionTask) => {
+    if (!task.result) return;
+    
+    const detailsContent = `
+文件名: ${task.filename}
+任务ID: ${task.id}
+状态: ${getStatusText(task.status)}
+语言: ${task.result.language}
+时长: ${formatDuration(task)}
+模型: ${task.result.model}
+创建时间: ${formatDate(task.created_at)}
+更新时间: ${formatDate(task.updated_at)}
+
+转录内容:
+${task.result.text}
+
+时间轴信息:
+${task.result.segments.map(seg => `${Math.floor(seg.start/60)}:${String(Math.floor(seg.start%60)).padStart(2,'0')} - ${Math.floor(seg.end/60)}:${String(Math.floor(seg.end%60)).padStart(2,'0')}: ${seg.text}`).join('\n')}
+    `;
+    
+    // 创建一个新窗口显示详情
+    const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+    if (newWindow) {
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>转录详情 - ${task.filename}</title>
+            <meta charset="UTF-8">
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+              .header { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+              .content { white-space: pre-wrap; }
+              .segment { margin: 5px 0; padding: 5px; background: #f9f9f9; border-left: 3px solid #007bff; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>转录详情</h1>
+              <p><strong>文件名:</strong> ${task.filename}</p>
+              <p><strong>任务ID:</strong> ${task.id}</p>
+              <p><strong>状态:</strong> ${getStatusText(task.status)}</p>
+              <p><strong>语言:</strong> ${task.result.language}</p>
+              <p><strong>时长:</strong> ${formatDuration(task)}</p>
+              <p><strong>模型:</strong> ${task.result.model}</p>
+              <p><strong>创建时间:</strong> ${formatDate(task.created_at)}</p>
+            </div>
+            <div class="content">
+              <h2>完整转录内容</h2>
+              <p>${task.result.text}</p>
+              
+              <h2>分段信息</h2>
+              ${task.result.segments.map(seg => `
+                <div class="segment">
+                  <strong>${Math.floor(seg.start/60)}:${String(Math.floor(seg.start%60)).padStart(2,'0')} - ${Math.floor(seg.end/60)}:${String(Math.floor(seg.end%60)).padStart(2,'0')}</strong><br>
+                  ${seg.text}
+                </div>
+              `).join('')}
+            </div>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
+  };
+
+  // 下载转录文件
+  const handleDownloadTranscript = (task: TranscriptionTask) => {
+    if (!task.result) return;
+    
+    const transcriptContent = `转录文件
+====================
+文件名: ${task.filename}
+任务ID: ${task.id}
+语言: ${task.result.language}
+时长: ${formatDuration(task)}
+模型: ${task.result.model}
+创建时间: ${formatDate(task.created_at)}
+
+完整转录内容:
+${task.result.text}
+
+分段信息:
+${task.result.segments.map(seg => 
+  `${Math.floor(seg.start/60)}:${String(Math.floor(seg.start%60)).padStart(2,'0')} - ${Math.floor(seg.end/60)}:${String(Math.floor(seg.end%60)).padStart(2,'0')}: ${seg.text}`
+).join('\n')}
+`;
+
+    const blob = new Blob([transcriptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `转录_${task.filename.replace(/\.[^/.]+$/, '')}_${task.id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // 删除单个任务
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('确定要删除这个任务吗？此操作不可撤销。')) return;
+    
+    try {
+      console.log('删除任务:', taskId);
+      
+      // 调用API删除任务
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // 删除成功，从本地状态中移除
+        setTasks(prev => prev.filter(task => task.id !== taskId));
+        setSelectedTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(taskId);
+          return newSet;
+        });
+        
+        alert('任务已成功删除');
+      } else {
+        console.error('删除任务失败:', result.error);
+        alert(`删除失败: ${result.error || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('删除任务失败:', error);
+      alert('删除失败，请检查网络连接后重试');
     }
   };
 
   // 格式化持续时间
-  const formatDuration = (segments: any[]) => {
-    if (!segments || segments.length === 0) return '未知';
-    const lastSegment = segments[segments.length - 1];
-    const totalSeconds = lastSegment?.end || 0;
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const formatDuration = (task: TranscriptionTask) => {
+    if (task.result?.duration) {
+      const totalSeconds = task.result.duration;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    if (task.result?.segments && task.result.segments.length > 0) {
+      const lastSegment = task.result.segments[task.result.segments.length - 1];
+      const totalSeconds = lastSegment?.end || 0;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    return '未知';
   };
 
   // 格式化日期
@@ -183,7 +390,8 @@ const HistoryPage: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status === 'failed' ? 'error' : status;
+    switch (normalizedStatus) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'processing': return 'bg-blue-100 text-blue-800';
       case 'error': return 'bg-red-100 text-red-800';
@@ -192,7 +400,8 @@ const HistoryPage: React.FC = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status === 'failed' ? 'error' : status;
+    switch (normalizedStatus) {
       case 'completed': return '✅ 已完成';
       case 'processing': return '⏳ 处理中';
       case 'error': return '❌ 失败';
@@ -386,7 +595,7 @@ const HistoryPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-sm text-gray-500">
-                            {formatDate(task.createdAt)}
+                            {formatDate(task.created_at)}
                           </div>
                         </div>
 
@@ -408,7 +617,7 @@ const HistoryPage: React.FC = () => {
                           <div className="mt-3">
                             <p className="text-sm text-gray-600 mb-2">
                               语言: {task.result.language} | 
-                              时长: {formatDuration(task.result.segments)}
+                              时长: {formatDuration(task)}
                             </p>
                             <p className="text-sm text-gray-800 line-clamp-3">
                               {task.result.text.substring(0, 200)}
@@ -428,15 +637,15 @@ const HistoryPage: React.FC = () => {
                         <div className="mt-4 flex space-x-3">
                           {task.status === 'completed' && (
                             <>
-                              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium" onClick={() => handleViewDetails(task)}>
                                 查看详情
                               </button>
-                              <button className="text-green-600 hover:text-green-800 text-sm font-medium">
+                              <button className="text-green-600 hover:text-green-800 text-sm font-medium" onClick={() => handleDownloadTranscript(task)}>
                                 下载转录
                               </button>
                             </>
                           )}
-                          <button className="text-red-600 hover:text-red-800 text-sm font-medium">
+                          <button className="text-red-600 hover:text-red-800 text-sm font-medium" onClick={() => handleDeleteTask(task.id)}>
                             删除
                           </button>
                         </div>

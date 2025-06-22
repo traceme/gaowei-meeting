@@ -119,6 +119,36 @@ router.get('/engines/status', async (req: Request, res: Response) => {
   }
 });
 
+// 获取所有转录任务列表
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { meetingManager } = initializeServices();
+    const { status, search, limit, offset } = req.query;
+
+    const filters = {
+      status: status as string,
+      title: search as string,
+      limit: limit ? parseInt(limit as string) : 100,
+      offset: offset ? parseInt(offset as string) : 0,
+    };
+
+    const tasks = meetingManager.getAllTranscriptionTasks(filters);
+    
+    sendSuccess(res, {
+      tasks,
+      total: tasks.length,
+      limit: filters.limit,
+      offset: filters.offset,
+    });
+  } catch (error) {
+    sendError(
+      res,
+      error instanceof Error ? error.message : '获取转录任务列表失败',
+      500
+    );
+  }
+});
+
 // 后台转录处理函数
 async function processTranscriptionInBackground(
   taskId: string,

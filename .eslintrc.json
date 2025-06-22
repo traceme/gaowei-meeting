@@ -1,13 +1,19 @@
 {
   "root": true,
   "extends": [
-    "eslint:recommended"
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking"
   ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
   "rules": {
     "prefer-const": "error",
     "no-var": "error",
     "no-console": "warn",
-    "no-unused-vars": "warn"
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-explicit-any": "warn"
   },
   "env": {
     "browser": true,
@@ -16,7 +22,8 @@
   },
   "parserOptions": {
     "ecmaVersion": 2022,
-    "sourceType": "module"
+    "sourceType": "module",
+    "project": ["./tsconfig.json", "./packages/*/tsconfig.json"]
   },
   "ignorePatterns": [
     "dist/",
@@ -26,6 +33,8 @@
     "*.config.ts",
     "coverage/",
     ".next/",
-    "storybook-static/"
+    "storybook-static/",
+    "**/*.js",
+    "**/*.mjs"
   ]
 } 

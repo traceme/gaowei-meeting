@@ -330,6 +330,64 @@ export class DatabaseManager {
     return task;
   }
 
+  getAllTranscriptionTasks(filters: SearchFilters = {}): TranscriptionTask[] {
+    let query = `
+      SELECT * FROM transcription_tasks
+    `;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    // 状态过滤
+    if (filters.status) {
+      conditions.push('status = ?');
+      params.push(filters.status);
+    }
+
+    // 文件名搜索
+    if (filters.title) {
+      conditions.push('filename LIKE ?');
+      params.push(`%${filters.title}%`);
+    }
+
+    // 日期过滤
+    if (filters.dateFrom) {
+      conditions.push('created_at >= ?');
+      params.push(filters.dateFrom);
+    }
+
+    if (filters.dateTo) {
+      conditions.push('created_at <= ?');
+      params.push(filters.dateTo);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    // 排序：最新的在前
+    query += ' ORDER BY created_at DESC';
+
+    // 分页
+    if (filters.limit) {
+      query += ' LIMIT ?';
+      params.push(filters.limit);
+    }
+
+    if (filters.offset) {
+      query += ' OFFSET ?';
+      params.push(filters.offset);
+    }
+
+    const stmt = this.db.prepare(query);
+    const tasks = stmt.all(...params) as TranscriptionTask[];
+
+    // 解析JSON字段
+    return tasks.map(task => ({
+      ...task,
+      result: task.result ? JSON.parse(task.result as string) : undefined,
+    }));
+  }
+
   updateTranscriptionTask(
     taskId: string,
     updates: Partial<TranscriptionTask>
@@ -356,6 +414,20 @@ export class DatabaseManager {
 
     const result = stmt.run(...values);
     return result.changes > 0;
+  }
+
+  deleteTranscriptionTask(taskId: string): boolean {
+    try {
+      const stmt = this.db.prepare(`
+        DELETE FROM transcription_tasks WHERE id = ?
+      `);
+
+      const result = stmt.run(taskId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('删除转录任务失败:', error);
+      return false;
+    }
   }
 
   // ===== 处理任务管理 =====

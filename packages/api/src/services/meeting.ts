@@ -146,6 +146,44 @@ export class MeetingManager {
     return this.db.getTranscriptionTask(id);
   }
 
+  async getAllTranscriptionTasks(filters?: {
+    status?: string;
+    title?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<TranscriptionTask[]> {
+    return this.db.getAllTranscriptionTasks(filters);
+  }
+
+  async deleteTask(taskId: string): Promise<boolean> {
+    try {
+      // 获取任务信息
+      const task = this.db.getTranscriptionTask(taskId);
+      if (!task) {
+        console.log(`❌ 任务 ${taskId} 不存在`);
+        return false;
+      }
+
+      // 删除转录任务
+      const deleted = this.db.deleteTranscriptionTask(taskId);
+      
+      if (deleted) {
+        console.log(`🗑️ 成功删除转录任务: ${taskId}`);
+        
+        // 可选：如果这是会议的唯一任务，也可以考虑删除会议记录
+        // 这里我们保留会议记录，只删除转录任务
+        
+        return true;
+      } else {
+        console.log(`❌ 删除转录任务失败: ${taskId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`删除任务 ${taskId} 时出错:`, error);
+      return false;
+    }
+  }
+
   async updateTranscriptionTask(
     id: string,
     updates: Partial<TranscriptionTask>
