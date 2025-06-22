@@ -6,6 +6,7 @@ import { sendSuccess } from '../middleware/index.js';
 import meetingsRouter from './meetings.js';
 import transcriptionRouter from './transcription.js';
 import summaryRouter from './summary.js';
+import engineRouter from './engine.js';
 
 const router: IRouter = Router();
 
@@ -49,6 +50,7 @@ router.get('/info', (req: Request, res: Response) => {
       meetings: '/api/meetings',
       transcription: '/api/transcription',
       summary: '/api/summary',
+      engine: '/api/engine',
       upload: '/api/transcription/upload',
       process: '/api/summary/process',
     },
@@ -65,6 +67,7 @@ router.get('/info', (req: Request, res: Response) => {
 router.use('/meetings', meetingsRouter);
 router.use('/transcription', transcriptionRouter);
 router.use('/summary', summaryRouter);
+router.use('/engine', engineRouter);
 
 // 兼容性路由 - 为了向后兼容，保留一些旧的端点
 router.post('/upload', (req: Request, res: Response) => {

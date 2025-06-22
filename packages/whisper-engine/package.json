@@ -15,7 +15,7 @@
     "download-models": "./download-ggml-model.sh"
   },
   "dependencies": {
-    "@gaowei/shared": "workspace:*",
+    "@gaowei/shared-types": "workspace:*",
     "axios": "^1.6.0",
     "child_process": "^1.0.2",
     "form-data": "^4.0.0",

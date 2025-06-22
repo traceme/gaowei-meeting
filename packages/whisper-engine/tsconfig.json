@@ -8,5 +8,14 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "**/*.test.*", 
+    "**/*.spec.*",
+    "src/whisper-cpp-server/build/**/*",
+    "src/whisper-cpp-server/CMakeFiles/**/*",
+    "src/whisper-cpp-server/**/*.cmake",
+    "src/whisper-cpp-server/**/*.make"
+  ]
 } 

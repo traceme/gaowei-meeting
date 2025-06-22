@@ -140,6 +140,24 @@ async function processTranscriptionInBackground(
     
     console.log(`🎙️ 开始转录任务 ${taskId}...`);
     
+    // 计算音频时长估算超时时间
+    const getTranscriptionTimeout = (audioBuffer: Buffer): number => {
+      // 基于文件大小估算音频时长（粗略估计）
+      const fileSizeMB = audioBuffer.length / (1024 * 1024);
+      const estimatedMinutes = Math.max(fileSizeMB / 2, 1); // 假设每2MB约1分钟音频
+      
+      // 转录时间通常是音频时长的0.5-1倍（取决于模型和硬件）
+      const transcriptionMinutes = Math.max(estimatedMinutes * 1, 10); // 至少10分钟
+      
+      // 最大360分钟超时，防止无限等待
+      return Math.min(transcriptionMinutes * 60, 360 * 60); // 秒数
+    };
+    
+    const timeoutSeconds = getTranscriptionTimeout(audioBuffer);
+    const maxAttempts = timeoutSeconds; // 每秒轮询一次
+    
+    console.log(`📊 预计转录时间: ${Math.round(timeoutSeconds/60)} 分钟，文件大小: ${Math.round(audioBuffer.length/(1024*1024))}MB`);
+    
     // 检查是否使用本地Whisper服务
     const whisperServerUrl = appConfig.whisper.serverUrl || 'http://localhost:8178';
     
@@ -170,7 +188,6 @@ async function processTranscriptionInBackground(
         console.log(`📋 Whisper任务ID: ${whisperTaskId}, 开始轮询进度...`);
         
         // 轮询Whisper服务的进度
-        const maxAttempts = 300; // 5分钟超时
         let attempts = 0;
         
         while (attempts < maxAttempts) {

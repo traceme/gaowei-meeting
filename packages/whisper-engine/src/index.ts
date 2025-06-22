@@ -1,13 +1,16 @@
+import path from 'path';
+import fs from 'fs';
+import axios from 'axios';
+import FormData from 'form-data';
 import type {
   TranscriptionResult,
   TranscriptionEngineType,
+  WhisperEngineType,
+  WhisperEngineConfig,
+  WhisperEngineStatus,
 } from '@gaowei/shared-types';
 import { spawn, ChildProcess } from 'child_process';
-import axios from 'axios';
-import FormData from 'form-data';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
-import * as fs from 'fs';
 
 // Whisper服务接口
 export interface WhisperService {
@@ -235,6 +238,17 @@ class LocalWhisperEngine implements WhisperService {
 
     const startTime = Date.now();
 
+    // 计算动态超时时间
+    const getTranscriptionTimeout = (audioBuffer: Buffer): number => {
+      const fileSizeMB = audioBuffer.length / (1024 * 1024);
+      const estimatedMinutes = Math.max(fileSizeMB / 2, 1); // 假设每2MB约1分钟音频
+      const transcriptionMinutes = Math.max(estimatedMinutes * 1.5, 10); // 转录时间是音频时长的1.5倍，至少10分钟
+      return Math.min(transcriptionMinutes * 60 * 1000, 360 * 60 * 1000); // 毫秒，最大360分钟
+    };
+
+    const timeoutMs = getTranscriptionTimeout(audioBuffer);
+    console.log(`📊 Faster-Whisper 预计转录时间: ${Math.round(timeoutMs/60000)} 分钟，文件大小: ${Math.round(audioBuffer.length/(1024*1024))}MB`);
+
     try {
       // 准备FormData
       const formData = new FormData();
@@ -260,7 +274,7 @@ class LocalWhisperEngine implements WhisperService {
           headers: {
             ...formData.getHeaders(),
           },
-          timeout: 300000, // 5分钟超时
+          timeout: timeoutMs,
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
         }
@@ -296,9 +310,12 @@ class LocalWhisperEngine implements WhisperService {
   private async waitForTaskCompletion(
     taskId: string
   ): Promise<TranscriptionResult> {
-    const maxWaitTime = 300000; // 5分钟
+    // 动态超时时间，从5分钟增加到360分钟，用于处理长音频
+    const maxWaitTime = 360 * 60 * 1000; // 360分钟
     const pollInterval = 2000; // 2秒
     const startTime = Date.now();
+
+    console.log(`⏱️ 开始等待任务完成，最大等待时间: ${maxWaitTime/60000} 分钟`);
 
     while (Date.now() - startTime < maxWaitTime) {
       try {
@@ -332,6 +349,223 @@ class LocalWhisperEngine implements WhisperService {
     }
 
     throw new Error('转录任务超时');
+  }
+}
+
+// C++ Whisper引擎实现
+class WhisperCppEngine implements WhisperService {
+  private readonly serverUrl: string;
+  private readonly serverPort: number;
+  private readonly modelPath: string;
+  private cppProcess: ChildProcess | null = null;
+  private isRunning = false;
+  private startPromise: Promise<void> | null = null;
+
+  constructor(
+    options: {
+      serverUrl?: string;
+      serverPort?: number;
+      modelPath?: string;
+    } = {}
+  ) {
+    this.serverPort = options.serverPort || 8081; // 不同端口避免冲突
+    this.serverUrl = options.serverUrl || `http://localhost:${this.serverPort}`;
+    this.modelPath = options.modelPath || 'models/ggml-base.en.bin';
+  }
+
+  async start(): Promise<void> {
+    // 检查服务是否已经在运行
+    const isHealthy = await this.isHealthy();
+    if (isHealthy) {
+      console.log('Found existing Whisper.cpp service running, using it directly');
+      this.isRunning = true;
+      return;
+    }
+
+    if (this.isRunning) {
+      return;
+    }
+
+    if (this.startPromise) {
+      return this.startPromise;
+    }
+
+    this.startPromise = this._startCppService();
+    return this.startPromise;
+  }
+
+  private async _startCppService(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // 检查编译的服务器是否存在
+      const serverPath = path.join(__dirname, 'whisper-cpp-server', 'build', 'examples', 'server', 'whisper-server');
+      
+      if (!fs.existsSync(serverPath)) {
+        reject(new Error(`Whisper.cpp server not found at: ${serverPath}. Please compile first.`));
+        return;
+      }
+
+      console.log(`Starting Whisper.cpp service: ${serverPath}`);
+      console.log(`Port: ${this.serverPort}, Model: ${this.modelPath}`);
+
+      this.cppProcess = spawn(
+        serverPath,
+        [
+          '--port',
+          this.serverPort.toString(),
+          '--model',
+          this.modelPath,
+          '--host',
+          '127.0.0.1',
+        ],
+        {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env },
+        }
+      );
+
+      let isResolved = false;
+
+      this.cppProcess.stdout?.on('data', data => {
+        const output = data.toString();
+        console.log(`Whisper.cpp service: ${output.trim()}`);
+
+        if (output.includes('HTTP server listening') && !isResolved) {
+          isResolved = true;
+          this.isRunning = true;
+          setTimeout(() => resolve(), 2000);
+        }
+      });
+
+      this.cppProcess.stderr?.on('data', data => {
+        const error = data.toString();
+        console.error(`Whisper.cpp service error: ${error.trim()}`);
+      });
+
+      this.cppProcess.on('error', error => {
+        console.error('Failed to start Whisper.cpp service:', error);
+        if (!isResolved) {
+          isResolved = true;
+          reject(error);
+        }
+      });
+
+      this.cppProcess.on('exit', code => {
+        console.log(`Whisper.cpp service exited with code ${code}`);
+        this.isRunning = false;
+        this.cppProcess = null;
+      });
+
+      // 超时处理
+      setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          reject(new Error('Whisper.cpp service start timeout'));
+        }
+      }, 30000);
+    });
+  }
+
+  async stop(): Promise<void> {
+    if (this.cppProcess) {
+      this.cppProcess.kill('SIGTERM');
+
+      await new Promise<void>(resolve => {
+        if (this.cppProcess) {
+          this.cppProcess.on('exit', () => resolve());
+          setTimeout(() => {
+            if (this.cppProcess) {
+              this.cppProcess.kill('SIGKILL');
+            }
+            resolve();
+          }, 5000);
+        } else {
+          resolve();
+        }
+      });
+    }
+
+    this.isRunning = false;
+    this.cppProcess = null;
+    this.startPromise = null;
+  }
+
+  async isHealthy(): Promise<boolean> {
+    try {
+      // whisper.cpp的服务器可能没有专门的health端点，尝试访问根路径
+      const response = await axios.get(`${this.serverUrl}/`, { timeout: 5000 });
+      return response.status === 200;
+    } catch {
+      return false;
+    }
+  }
+
+  async transcribe(
+    audioBuffer: Buffer,
+    options?: WhisperTranscriptionOptions
+  ): Promise<TranscriptionResult> {
+    if (!this.isRunning) {
+      throw new Error('Whisper.cpp service is not running');
+    }
+
+    // 计算动态超时时间
+    const getTranscriptionTimeout = (audioBuffer: Buffer): number => {
+      const fileSizeMB = audioBuffer.length / (1024 * 1024);
+      const estimatedMinutes = Math.max(fileSizeMB / 2, 1); // 假设每2MB约1分钟音频
+      const transcriptionMinutes = Math.max(estimatedMinutes * 2, 15); // C++版本可能更慢，使用2倍时间，至少15分钟
+      return Math.min(transcriptionMinutes * 60 * 1000, 360 * 60 * 1000); // 毫秒，最大360分钟
+    };
+
+    const timeoutMs = getTranscriptionTimeout(audioBuffer);
+    console.log(`📊 Whisper.cpp 预计转录时间: ${Math.round(timeoutMs/60000)} 分钟，文件大小: ${Math.round(audioBuffer.length/(1024*1024))}MB`);
+
+    const formData = new FormData();
+    
+    // C++ 服务器期望的字段名
+    formData.append('file', audioBuffer, {
+      filename: options?.filename || 'audio.wav',
+      contentType: 'audio/wav',
+    });
+
+    if (options?.language) {
+      formData.append('language', options.language === 'zh-cn' ? 'zh' : options.language);
+    }
+
+    if (options?.temperature !== undefined) {
+      formData.append('temperature', options.temperature.toString());
+    }
+
+    // 强制使用 JSON 格式
+    formData.append('response_format', 'json');
+
+    try {
+      const response = await axios.post(
+        `${this.serverUrl}/inference`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: timeoutMs,
+        }
+      );
+
+      const result = response.data;
+      
+      // 处理C++服务器的响应格式
+      return {
+        text: result.text || '',
+        language: result.language,
+        segments: result.segments?.map((seg: any) => ({
+          start: seg.start || seg.t0,
+          end: seg.end || seg.t1,
+          text: seg.text,
+          confidence: seg.confidence,
+        })),
+        duration: result.duration,
+        model: 'whisper.cpp',
+      };
+    } catch (error: any) {
+      console.error('Whisper.cpp transcription error:', error);
+      throw new Error(`Whisper.cpp transcription failed: ${error.message}`);
+    }
   }
 }
 
@@ -373,6 +607,17 @@ class OpenAIWhisperEngine implements WhisperService {
   ): Promise<TranscriptionResult> {
     const startTime = Date.now();
 
+    // 计算动态超时时间
+    const getTranscriptionTimeout = (audioBuffer: Buffer): number => {
+      const fileSizeMB = audioBuffer.length / (1024 * 1024);
+      const estimatedMinutes = Math.max(fileSizeMB / 2, 1); // 假设每2MB约1分钟音频
+      const transcriptionMinutes = Math.max(estimatedMinutes * 0.3, 5); // OpenAI API更快，使用0.3倍时间，至少5分钟
+      return Math.min(transcriptionMinutes * 60 * 1000, 360 * 60 * 1000); // 毫秒，最大360分钟
+    };
+
+    const timeoutMs = getTranscriptionTimeout(audioBuffer);
+    console.log(`📊 OpenAI Whisper 预计转录时间: ${Math.round(timeoutMs/60000)} 分钟，文件大小: ${Math.round(audioBuffer.length/(1024*1024))}MB`);
+
     try {
       const formData = new FormData();
       formData.append('file', audioBuffer, {
@@ -393,7 +638,7 @@ class OpenAIWhisperEngine implements WhisperService {
             ...formData.getHeaders(),
             Authorization: `Bearer ${this.apiKey}`,
           },
-          timeout: 120000, // 2分钟超时
+          timeout: timeoutMs,
         }
       );
 
@@ -417,9 +662,157 @@ class OpenAIWhisperEngine implements WhisperService {
   }
 }
 
-// 工厂函数
+// 引擎管理器
+export class WhisperEngineManager {
+  private engines: Map<WhisperEngineType, WhisperService> = new Map();
+  private configs: Map<WhisperEngineType, WhisperEngineConfig> = new Map();
+
+  constructor() {
+    this.initializeConfigs();
+  }
+
+  private initializeConfigs(): void {
+    // Faster-Whisper配置
+    this.configs.set('faster-whisper', {
+      type: 'faster-whisper',
+      port: 8178,
+      enabled: true,
+      description: 'Python based faster-whisper engine with GPU support',
+      features: {
+        realTimeProgress: true,
+        multiLanguage: true,
+        gpu: true,
+        performance: 'high',
+        memoryUsage: 'medium',
+      },
+    });
+
+    // Whisper.cpp配置  
+    this.configs.set('whisper-cpp', {
+      type: 'whisper-cpp',
+      port: 8081,
+      enabled: true,
+      description: 'Native C++ implementation with high performance',
+      features: {
+        realTimeProgress: false,
+        multiLanguage: true,
+        gpu: false,
+        performance: 'high',
+        memoryUsage: 'low',
+      },
+    });
+
+    // OpenAI配置
+    this.configs.set('openai', {
+      type: 'openai',
+      enabled: true,
+      description: 'OpenAI Whisper API service',
+      features: {
+        realTimeProgress: false,
+        multiLanguage: true,
+        gpu: true,
+        performance: 'high',
+        memoryUsage: 'low',
+      },
+    });
+  }
+
+  getEngineConfig(type: WhisperEngineType): WhisperEngineConfig | undefined {
+    return this.configs.get(type);
+  }
+
+  getAllConfigs(): WhisperEngineConfig[] {
+    return Array.from(this.configs.values());
+  }
+
+  async createEngine(type: WhisperEngineType, options?: any): Promise<WhisperService> {
+    // 检查是否已存在
+    if (this.engines.has(type)) {
+      const existing = this.engines.get(type)!;
+      const isHealthy = await existing.isHealthy();
+      if (isHealthy) {
+        return existing;
+      }
+    }
+
+    // 创建新引擎
+    let engine: WhisperService;
+    
+    switch (type) {
+      case 'faster-whisper':
+        engine = new LocalWhisperEngine(options);
+        break;
+      case 'whisper-cpp':
+        engine = new WhisperCppEngine(options);
+        break;
+      case 'openai':
+        if (!options?.apiKey) {
+          throw new Error('OpenAI API key is required');
+        }
+        engine = new OpenAIWhisperEngine(options.apiKey);
+        break;
+      default:
+        throw new Error(`Unsupported engine type: ${type}`);
+    }
+
+    // 启动引擎
+    await engine.start();
+    this.engines.set(type, engine);
+    
+    return engine;
+  }
+
+  async getEngineStatus(type: WhisperEngineType): Promise<WhisperEngineStatus> {
+    const engine = this.engines.get(type);
+    const config = this.configs.get(type);
+    
+    if (!engine || !config) {
+      return {
+        type,
+        status: 'stopped',
+        lastCheck: new Date().toISOString(),
+      };
+    }
+
+    try {
+      const isHealthy = await engine.isHealthy();
+      return {
+        type,
+        status: isHealthy ? 'running' : 'stopped',
+        port: config.port,
+        lastCheck: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      return {
+        type,
+        status: 'error',
+        lastCheck: new Date().toISOString(),
+        error: error.message,
+      };
+    }
+  }
+
+  async stopEngine(type: WhisperEngineType): Promise<void> {
+    const engine = this.engines.get(type);
+    if (engine) {
+      await engine.stop();
+      this.engines.delete(type);
+    }
+  }
+
+  async stopAllEngines(): Promise<void> {
+    const stopPromises = Array.from(this.engines.keys()).map(type => this.stopEngine(type));
+    await Promise.all(stopPromises);
+  }
+}
+
+// 全局引擎管理器实例
+export const whisperEngineManager = new WhisperEngineManager();
+
+// 更新的工厂函数
 export function createWhisperEngine(
   type: TranscriptionEngineType = 'local',
+  engineType?: WhisperEngineType,
   options?: {
     apiKey?: string;
     serverUrl?: string;
@@ -427,25 +820,27 @@ export function createWhisperEngine(
     modelPath?: string;
   }
 ): WhisperService {
-  switch (type) {
-    case 'local':
-    case 'whisper-local':
-      return new LocalWhisperEngine({
-        serverUrl: options?.serverUrl,
-        serverPort: options?.serverPort,
-        modelPath: options?.modelPath,
-      });
-
-    case 'openai-whisper':
-    case 'whisper-openai':
-      if (!options?.apiKey) {
-        throw new Error('OpenAI API key is required');
-      }
-      return new OpenAIWhisperEngine(options.apiKey);
-
-    default:
-      throw new Error(`不支持的转录引擎类型: ${type}`);
+  if (type === 'local') {
+    // 本地引擎，支持选择具体类型
+    const whisperType = engineType || 'faster-whisper';
+    
+    switch (whisperType) {
+      case 'faster-whisper':
+        return new LocalWhisperEngine(options);
+      case 'whisper-cpp':
+        return new WhisperCppEngine(options);
+      default:
+        return new LocalWhisperEngine(options);
+    }
+  } else if (type === 'openai-whisper' || type === 'whisper-openai') {
+    if (!options?.apiKey) {
+      throw new Error('OpenAI API key is required for OpenAI engine');
+    }
+    return new OpenAIWhisperEngine(options.apiKey, options.serverUrl);
   }
+
+  // 默认返回 faster-whisper
+  return new LocalWhisperEngine(options);
 }
 
 // 默认导出

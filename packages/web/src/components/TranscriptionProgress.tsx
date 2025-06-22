@@ -1,4 +1,5 @@
 import React from 'react'
+import { getEngineDisplayName } from '../utils/engineUtils'
 
 interface TranscriptionProgressProps {
   files: Array<{
@@ -250,7 +251,9 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">转录引擎:</span>
-                    <span className="font-medium text-green-600">本地 Whisper</span>
+                    <span className="font-medium text-green-600">
+                      {currentTask.engine ? getEngineDisplayName(currentTask.engine as any) : '本地 Whisper'}
+                    </span>
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">音频时长:</span>

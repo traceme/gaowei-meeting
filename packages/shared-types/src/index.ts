@@ -125,6 +125,49 @@ export interface TranscriptionOptions {
   quality?: 'low' | 'medium' | 'high';
 }
 
+// Whisper引擎类型定义
+export type WhisperEngineType = 'faster-whisper' | 'whisper-cpp' | 'openai';
+
+// Whisper引擎配置
+export interface WhisperEngineConfig {
+  type: WhisperEngineType;
+  port?: number;
+  modelPath?: string;
+  serverUrl?: string;
+  enabled: boolean;
+  description: string;
+  features: {
+    realTimeProgress: boolean;
+    multiLanguage: boolean;
+    gpu: boolean;
+    performance: 'low' | 'medium' | 'high';
+    memoryUsage: 'low' | 'medium' | 'high';
+  };
+}
+
+// 转录引擎状态
+export interface WhisperEngineStatus {
+  type: WhisperEngineType;
+  status: 'starting' | 'running' | 'stopped' | 'error';
+  port?: number;
+  pid?: number;
+  lastCheck: string;
+  error?: string;
+  version?: string;
+  capabilities?: string[];
+}
+
+// 引擎选择请求
+export interface EngineSelectionRequest {
+  engine: WhisperEngineType;
+  file: File | Buffer;
+  options?: {
+    language?: string;
+    model?: string;
+    temperature?: number;
+  };
+}
+
 // 摘要处理类型
 export interface SummaryProcess {
   meeting_id: string;

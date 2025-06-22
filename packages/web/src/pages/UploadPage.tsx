@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { VidstackAudioPlayer } from '../components/VidstackAudioPlayer'
 import TranscriptionDetail, { type TranscriptionData } from '../components/TranscriptionDetail'
 import TranscriptionProgress from '../components/TranscriptionProgress'
+import type { WhisperEngineType } from '@gaowei/shared-types'
 
 interface TranscriptionTask {
   id: string
@@ -39,7 +40,28 @@ const UploadPage = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [currentTask, setCurrentTask] = useState<TranscriptionTask | null>(null)
   const [showProgress, setShowProgress] = useState(false)
+  const [currentEngine, setCurrentEngine] = useState<WhisperEngineType>('faster-whisper') // 默认引擎
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 获取当前选择的引擎
+  useEffect(() => {
+    const fetchCurrentEngine = async () => {
+      try {
+        const response = await fetch('/api/engine/current')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data?.engine) {
+            setCurrentEngine(data.data.engine)
+            console.log('当前选择的引擎:', data.data.engine)
+          }
+        }
+      } catch (error) {
+        console.warn('获取当前引擎失败，使用默认引擎:', error)
+      }
+    }
+    
+    fetchCurrentEngine()
+  }, [])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -86,6 +108,7 @@ const UploadPage = () => {
     if (!file) return // 确保文件存在
     
     console.log('🚀 开始上传文件:', file.name, file.size, 'bytes')
+    console.log('🔧 使用引擎:', currentEngine)
     
     setIsUploading(true)
     setShowProgress(true)
@@ -122,13 +145,14 @@ const UploadPage = () => {
         throw new Error('服务器响应格式错误：缺少任务ID')
       }
       
-      // 设置当前任务并开始轮询
+      // 设置当前任务并开始轮询，包含引擎信息
       setCurrentTask({
         id: taskId,
         status: 'pending',
         filename: file.name,
         progress: 0,
         createdAt: new Date().toISOString(),
+        engine: currentEngine, // 包含当前选择的引擎
       })
       
       console.log('🔄 开始轮询转录状态, taskId:', taskId)
@@ -176,7 +200,11 @@ const UploadPage = () => {
         
         console.log(`📈 任务状态: ${task.status}, 进度: ${task.progress}%`)
         
-        setCurrentTask(task)
+        // 更新任务状态，保留引擎信息
+        setCurrentTask(prevTask => ({
+          ...task,
+          engine: prevTask?.engine || currentEngine // 保留之前的引擎信息或使用当前引擎
+        }))
         
         // 更新进度条
         if (task.status === 'processing') {
@@ -192,7 +220,8 @@ const UploadPage = () => {
               setCurrentTask(prev => prev ? { 
                 ...prev, 
                 currentStage: 'AI摘要生成中...',
-                progress: 90 // 设置为90%，表示进入AI摘要阶段
+                progress: 90, // 设置为90%，表示进入AI摘要阶段
+                engine: prev.engine || currentEngine // 确保引擎信息被保留
               } : prev)
               
               // 调用AI摘要API
@@ -215,6 +244,7 @@ const UploadPage = () => {
                 setCurrentTask(prev => prev ? {
                   ...prev,
                   progress: 100, // 完成所有处理
+                  engine: prev.engine || currentEngine, // 确保引擎信息被保留
                   summary: {
                     text: summaryResult.data.summary.summary || summaryResult.summary?.summary,
                     model: summaryResult.data.summary.model || 'default',

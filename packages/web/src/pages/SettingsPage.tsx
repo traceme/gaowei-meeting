@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { WhisperEngineSelector } from '../components/WhisperEngineSelector'
+import type { WhisperEngineType } from '@gaowei/shared-types'
 
 interface AIProviderConfig {
   type: 'local' | 'openai' | 'claude' | 'gemini'
@@ -12,8 +14,9 @@ interface AIProviderConfig {
 }
 
 const SettingsPage = () => {
-  const [activeTab, setActiveTab] = useState<'ai' | 'system' | 'export' | 'about'>('ai')
+  const [activeTab, setActiveTab] = useState<'ai' | 'whisper' | 'system' | 'export' | 'about'>('ai')
   const [isTestingConnection, setIsTestingConnection] = useState(false)
+  const [selectedWhisperEngine, setSelectedWhisperEngine] = useState<WhisperEngineType>('faster-whisper')
 
   const [aiProviders, setAiProviders] = useState<AIProviderConfig[]>([
     {
@@ -53,6 +56,7 @@ const SettingsPage = () => {
 
   const tabs = [
     { id: 'ai', label: 'AI 设置', icon: '🤖' },
+    { id: 'whisper', label: 'Whisper 引擎', icon: '🎙️' },
     { id: 'system', label: '系统设置', icon: '⚙️' },
     { id: 'about', label: '关于', icon: 'ℹ️' }
   ]
@@ -147,6 +151,49 @@ const SettingsPage = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Whisper 引擎设置 */}
+          {activeTab === 'whisper' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Whisper 转录引擎配置
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  选择最适合您需求的转录引擎。不同引擎在性能、精度和资源占用方面各有优势。
+                </p>
+              </div>
+
+              <WhisperEngineSelector
+                selectedEngine={selectedWhisperEngine}
+                onEngineChange={setSelectedWhisperEngine}
+                className="mb-6"
+              />
+
+              {/* 引擎说明 */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-800 mb-2">💡 选择建议</h4>
+                <ul className="text-sm text-amber-700 space-y-1">
+                  <li>• <strong>Faster-Whisper</strong>: 推荐用于日常使用，功能完整，支持GPU加速</li>
+                  <li>• <strong>Whisper.cpp</strong>: 适合资源受限环境，内存占用低，启动快速</li>
+                  <li>• <strong>OpenAI Whisper</strong>: 云端服务，无需本地资源，需要API密钥</li>
+                </ul>
+              </div>
+
+              {/* 当前选择的引擎状态 */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3">当前引擎状态</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">选中的引擎:</span>
+                  <span className="font-medium text-gray-900">
+                    {selectedWhisperEngine === 'faster-whisper' && 'Faster-Whisper'}
+                    {selectedWhisperEngine === 'whisper-cpp' && 'Whisper.cpp'}
+                    {selectedWhisperEngine === 'openai' && 'OpenAI Whisper'}
+                  </span>
+                </div>
               </div>
             </div>
           )}

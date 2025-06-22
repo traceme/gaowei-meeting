@@ -45,6 +45,16 @@ export interface AppConfig {
     serverPort: number;
     model: string;
     modelSize: string;
+    timeout: {
+      calculateTimeout: (fileSizeMB: number, engineMultiplier: number) => number;
+      engines: {
+        'faster-whisper': number;
+        'whisper-cpp': number;
+        'openai': number;
+      };
+      min: number;
+      max: number;
+    };
   };
 }
 
@@ -114,6 +124,20 @@ export const appConfig: AppConfig = {
     model: process.env.WHISPER_MODEL || 'small',
     modelSize:
       process.env.WHISPER_MODEL_SIZE || process.env.WHISPER_MODEL || 'small',
+    timeout: {
+      calculateTimeout: (fileSizeMB: number, engineMultiplier: number = 1): number => {
+        const estimatedMinutes = Math.max(fileSizeMB / 2, 1); // 假设每2MB约1分钟音频
+        const transcriptionMinutes = Math.max(estimatedMinutes * engineMultiplier, 10); // 至少10分钟
+        return Math.min(transcriptionMinutes * 60, 120 * 60); // 秒数，最大120分钟
+      },
+      engines: {
+        'faster-whisper': 1.0,    // Python faster-whisper
+        'whisper-cpp': 2.0,       // C++ 版本可能更慢
+        'openai': 0.3,            // OpenAI API 最快
+      },
+      min: 10,
+      max: 120,
+    },
   },
 };
 
