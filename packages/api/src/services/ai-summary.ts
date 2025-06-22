@@ -240,19 +240,24 @@ export class AISummaryGenerator {
   }
 
   private createSummaryPrompt(transcriptText: string): string {
-    return `请对以下会议转录内容进行智能摘要，提取关键要点、决策和行动项。
-请严格使用简体中文回答，不要使用繁体中文字符。
+    return `你是一个专业的会议摘要助手。请对以下会议转录内容进行智能摘要，提取关键要点、决策和行动项。
+
+⚠️ 重要要求：
+- 必须使用简体中文（Simplified Chinese）回答
+- 禁止使用繁体中文字符，如：請、會議、決策、時間、參與者等
+- 使用大陆地区标准简体中文，如：请、会议、决策、时间、参与者等
+- 避免港台用词，使用大陆标准用词
 
 转录内容：
 "${transcriptText}"
 
-请按以下格式输出摘要：
+请严格按以下格式输出摘要（使用简体中文）：
 
 ## 📋 会议摘要
 
 ### 🎯 关键要点
 - [要点1]
-- [要点2]
+- [要点2] 
 - [要点3]
 
 ### 💡 重要决策
@@ -268,7 +273,7 @@ export class AISummaryGenerator {
 - 主要参与者：[从内容推断]
 - 讨论主题：[主要话题]
 
-请用简洁明了的简体中文回答，重点突出最重要的信息。`;
+请确保全部使用简体中文回答，语言简洁明了，重点突出最重要的信息。`;
   }
 
   private generateFallbackSummary(transcriptText: string): string {

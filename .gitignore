@@ -180,4 +180,12 @@ dev-debug.log
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/ # 备份文件夹
+backups/
+
+# 上传文件夹
+uploads/
+
+# 数据库临时文件
+packages/api/data/*.db-shm
+packages/api/data/*.db-wal

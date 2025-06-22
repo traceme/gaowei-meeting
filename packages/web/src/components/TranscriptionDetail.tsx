@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { VidstackAudioPlayer, type AudioSegment } from './VidstackAudioPlayer';
+import ReactMarkdown from 'react-markdown';
 
 export interface TranscriptionData {
   id: string;
@@ -299,23 +300,59 @@ export const TranscriptionDetail: React.FC<TranscriptionDetailProps> = ({
                   AI智能摘要
                 </h3>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (transcription.summary) {
-                      navigator.clipboard.writeText(transcription.summary);
+                      try {
+                        await navigator.clipboard.writeText(transcription.summary);
+                        // 显示成功提示
+                        const button = document.activeElement as HTMLButtonElement;
+                        const originalText = button.textContent;
+                        button.textContent = '已复制!';
+                        button.classList.add('bg-green-100', 'text-green-700');
+                        button.classList.remove('bg-purple-100', 'text-purple-700');
+                        
+                        setTimeout(() => {
+                          button.textContent = originalText;
+                          button.classList.remove('bg-green-100', 'text-green-700');
+                          button.classList.add('bg-purple-100', 'text-purple-700');
+                        }, 2000);
+                      } catch (err) {
+                        console.error('复制失败:', err);
+                        alert('复制失败，请手动选择文本复制');
+                      }
                     }
                   }}
-                  className="px-3 py-1 text-sm bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
+                  disabled={!transcription.summary}
+                  className={`px-3 py-1 text-sm rounded transition-colors ${
+                    transcription.summary 
+                      ? 'bg-purple-100 hover:bg-purple-200 text-purple-700 cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
                 >
                   复制摘要
                 </button>
               </div>
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
-                <div 
-                  className="prose prose-sm max-w-none text-gray-700"
-                  dangerouslySetInnerHTML={{ 
-                    __html: (transcription.summary || '暂无AI摘要内容').replace(/\n/g, '<br/>') 
-                  }}
-                />
+                <div className="prose prose-sm max-w-none text-gray-700">
+                  <ReactMarkdown
+                    components={{
+                      // 自定义样式
+                      h1: ({children}) => <h1 className="text-xl font-bold text-gray-900 mb-3">{children}</h1>,
+                      h2: ({children}) => <h2 className="text-lg font-semibold text-gray-800 mb-2 mt-4">{children}</h2>,
+                      h3: ({children}) => <h3 className="text-md font-medium text-gray-700 mb-2 mt-3">{children}</h3>,
+                      ul: ({children}) => <ul className="list-disc pl-5 mb-3 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-5 mb-3 space-y-1">{children}</ol>,
+                      li: ({children}) => <li className="text-gray-700">{children}</li>,
+                      p: ({children}) => <p className="mb-2 text-gray-700 leading-relaxed">{children}</p>,
+                      strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                      em: ({children}) => <em className="italic text-gray-600">{children}</em>,
+                      code: ({children}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>,
+                      blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600">{children}</blockquote>,
+                    }}
+                  >
+                    {transcription.summary || '暂无AI摘要内容'}
+                  </ReactMarkdown>
+                </div>
               </div>
 
               {transcription.keywords && transcription.keywords.length > 0 && (
