@@ -54,26 +54,31 @@ npm run build
 一旦配置完成，你就可以在 Claude 中直接使用以下工具：
 
 ### 获取项目分析
+
 ```
 请使用 get_project_analysis 工具获取项目的完整架构分析
 ```
 
 ### 读取关键文件
+
 ```
 请使用 read_key_file 工具读取 FRONTEND_MAIN_PAGE 文件的内容
 ```
 
 ### 创建新的React组件
+
 ```
 请使用 create_react_component 工具创建一个名为 AudioPlayer 的新组件
 ```
 
 ### 添加Tauri命令
+
 ```
 请使用 add_tauri_command 工具添加一个名为 get_system_info 的新命令
 ```
 
 ### 更新文件内容
+
 ```
 请使用 update_key_file 工具更新 TAURI_BACKEND_LIB 文件，添加新的功能...
 ```
@@ -103,15 +108,18 @@ npm start
 ## 故障排除
 
 ### MCP服务器未连接
+
 1. 确保 Claude 桌面版已完全重启
 2. 检查配置文件路径是否正确
 3. 确保 `start.sh` 脚本有执行权限：`chmod +x start.sh`
 
 ### 文件操作失败
+
 1. 确保MCP服务器有读写项目文件的权限
 2. 检查项目路径是否正确设置
 
 ### 依赖安装问题
+
 如果遇到依赖安装问题，请确保你的Node.js版本 >= 18。
 
 ## 技术栈
@@ -123,4 +131,4 @@ npm start
 
 ## 许可证
 
-ISC License 
+ISC License

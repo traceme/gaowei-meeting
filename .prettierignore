@@ -44,4 +44,30 @@ temp/
 .taskmaster/
 
 # Documentation
-CHANGELOG.md 
+CHANGELOG.md
+
+# 日志和缓存
+.cache/
+.turbo/
+
+# 环境变量
+.env*
+!.env.example
+
+# 数据库
+*.db-*
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/
+
+# 特定文件
+package-lock.json
+yarn.lock
+
+# 自动生成的文件
+.eslintcache
+*.tsbuildinfo 

@@ -21,19 +21,28 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "build/**", "storybook-static/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "build/**", "storybook-static/**"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "package.json", "tsconfig.json"],
+      "outputMode": "hash-only"
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
     },
     "lint": {
-      "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", ".eslintrc.js", "package.json"]
+    },
+    "lint:fix": {
+      "outputs": [],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", ".eslintrc.js", "package.json"],
+      "cache": false
     },
     "type-check": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": ["*.tsbuildinfo"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "tsconfig.json", "package.json"]
     },
     "clean": {
       "cache": false,
@@ -42,7 +51,21 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.tsx"]
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.tsx", "vitest.config.ts", "package.json"]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "format": {
+      "outputs": [],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "**/*.md", "**/*.json", ".prettierrc.js"],
+      "cache": false
+    },
+    "format:check": {
+      "outputs": [],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "**/*.md", "**/*.json", ".prettierrc.js"]
     },
     "db:generate": {
       "cache": false,

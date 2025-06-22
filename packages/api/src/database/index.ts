@@ -1,14 +1,14 @@
 import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { mkdirSync, existsSync } from 'fs';
-import type { 
-  Meeting, 
-  Transcript, 
-  SummaryProcess, 
-  TranscriptChunk, 
+import type {
+  Meeting,
+  Transcript,
+  SummaryProcess,
+  TranscriptChunk,
   ModelConfig,
   TranscriptionTask,
-  ProcessTask
+  ProcessTask,
 } from '@gaowei/shared-types';
 
 export interface DatabaseStats {
@@ -176,25 +176,25 @@ export class DatabaseManager {
   }
 
   // ===== 会议管理 =====
-  
+
   createMeeting(title: string, description?: string): Meeting {
     const now = new Date().toISOString();
     const id = `meeting_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const stmt = this.db.prepare(`
       INSERT INTO meetings (id, title, description, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `);
-    
+
     stmt.run(id, title, description || '', now, now);
-    
+
     return {
       id,
       title,
       description,
       status: 'pending',
       created_at: now,
-      updated_at: now
+      updated_at: now,
     } as Meeting;
   }
 
@@ -288,17 +288,20 @@ export class DatabaseManager {
 
   // ===== 转录任务管理 =====
 
-  createTranscriptionTask(meetingId: string, filename: string): TranscriptionTask {
+  createTranscriptionTask(
+    meetingId: string,
+    filename: string
+  ): TranscriptionTask {
     const now = new Date().toISOString();
     const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const stmt = this.db.prepare(`
       INSERT INTO transcription_tasks (id, meeting_id, filename, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `);
-    
+
     stmt.run(id, meetingId, filename, now, now);
-    
+
     return {
       id,
       meeting_id: meetingId,
@@ -306,7 +309,7 @@ export class DatabaseManager {
       status: 'pending',
       progress: 0,
       created_at: now,
-      updated_at: now
+      updated_at: now,
     };
   }
 
@@ -314,10 +317,23 @@ export class DatabaseManager {
     const stmt = this.db.prepare(`
       SELECT * FROM transcription_tasks WHERE id = ?
     `);
-    return stmt.get(taskId) as TranscriptionTask | null;
+    const task = stmt.get(taskId) as TranscriptionTask | null;
+    
+    if (task && task.result && typeof task.result === 'string') {
+      try {
+        task.result = JSON.parse(task.result);
+      } catch (error) {
+        console.warn(`Failed to parse result JSON for task ${taskId}:`, error);
+      }
+    }
+    
+    return task;
   }
 
-  updateTranscriptionTask(taskId: string, updates: Partial<TranscriptionTask>): boolean {
+  updateTranscriptionTask(
+    taskId: string,
+    updates: Partial<TranscriptionTask>
+  ): boolean {
     const now = new Date().toISOString();
     const fields: string[] = [];
     const values: any[] = [];
@@ -347,21 +363,21 @@ export class DatabaseManager {
   createProcessTask(meetingId: string): ProcessTask {
     const now = new Date().toISOString();
     const id = `process_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const stmt = this.db.prepare(`
       INSERT INTO process_tasks (id, meeting_id, created_at, updated_at)
       VALUES (?, ?, ?, ?)
     `);
-    
+
     stmt.run(id, meetingId, now, now);
-    
+
     return {
       id,
       meeting_id: meetingId,
       status: 'pending',
       progress: 0,
       created_at: now,
-      updated_at: now
+      updated_at: now,
     };
   }
 
@@ -398,13 +414,13 @@ export class DatabaseManager {
   }
 
   // ===== 转录管理 =====
-  
+
   saveMeetingTranscript(
-    meetingId: string, 
-    transcript: string, 
-    timestamp: string, 
-    summary: string = '', 
-    actionItems: string = '', 
+    meetingId: string,
+    transcript: string,
+    timestamp: string,
+    summary: string = '',
+    actionItems: string = '',
     keyPoints: string = ''
   ): void {
     const transcriptId = `${meetingId}_${Date.now()}`;
@@ -412,8 +428,16 @@ export class DatabaseManager {
       INSERT INTO transcripts (id, meeting_id, transcript, timestamp, summary, action_items, key_points)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    stmt.run(transcriptId, meetingId, transcript, timestamp, summary, actionItems, keyPoints);
+
+    stmt.run(
+      transcriptId,
+      meetingId,
+      transcript,
+      timestamp,
+      summary,
+      actionItems,
+      keyPoints
+    );
   }
 
   saveTranscript(
@@ -430,8 +454,16 @@ export class DatabaseManager {
       (meeting_id, transcript_text, model, model_name, chunk_size, overlap, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    stmt.run(meetingId, transcriptText, model, modelName, chunkSize || null, overlap || null, now);
+
+    stmt.run(
+      meetingId,
+      transcriptText,
+      model,
+      modelName,
+      chunkSize || null,
+      overlap || null,
+      now
+    );
   }
 
   getTranscriptData(meetingId: string): TranscriptChunk | null {
@@ -443,7 +475,7 @@ export class DatabaseManager {
 
   updateMeetingName(meetingId: string, meetingName: string): void {
     const now = new Date().toISOString();
-    
+
     // 更新会议表
     const updateMeeting = this.db.prepare(`
       UPDATE meetings SET title = ?, updated_at = ? WHERE id = ?
@@ -458,7 +490,7 @@ export class DatabaseManager {
   }
 
   // ===== 摘要处理管理 =====
-  
+
   createProcess(meetingId: string): string {
     const now = new Date().toISOString();
     const stmt = this.db.prepare(`
@@ -466,7 +498,7 @@ export class DatabaseManager {
       (meeting_id, status, created_at, updated_at, start_time)
       VALUES (?, ?, ?, ?, ?)
     `);
-    
+
     stmt.run(meetingId, 'PENDING', now, now, now);
     return meetingId;
   }
@@ -510,27 +542,29 @@ export class DatabaseManager {
     }
 
     values.push(meetingId);
-    
+
     const stmt = this.db.prepare(`
       UPDATE summary_processes SET ${fields.join(', ')} WHERE meeting_id = ?
     `);
-    
+
     stmt.run(...values);
   }
 
   // ===== 设置管理 =====
-  
+
   getModelConfig(): ModelConfig | null {
     const stmt = this.db.prepare(`
       SELECT * FROM settings WHERE id = 'default'
     `);
     const result = stmt.get() as any;
-    return result ? {
-      id: result.id,
-      provider: result.provider,
-      model: result.model,
-      whisperModel: result.whisperModel
-    } : null;
+    return result
+      ? {
+          id: result.id,
+          provider: result.provider,
+          model: result.model,
+          whisperModel: result.whisperModel,
+        }
+      : null;
   }
 
   saveModelConfig(provider: string, model: string, whisperModel: string): void {
@@ -541,12 +575,14 @@ export class DatabaseManager {
   }
 
   // ===== API密钥管理 =====
-  
+
   saveApiKey(apiKey: string, provider: string): void {
     // 从数据库获取当前API密钥配置
-    const stmt = this.db.prepare(`SELECT api_keys FROM settings WHERE id = 'default'`);
+    const stmt = this.db.prepare(
+      `SELECT api_keys FROM settings WHERE id = 'default'`
+    );
     const result = stmt.get() as any;
-    
+
     let apiKeys: Record<string, string> = {};
     if (result?.api_keys) {
       try {
@@ -569,21 +605,23 @@ export class DatabaseManager {
   getApiKey(provider: string): string | null {
     // 优先从环境变量获取
     const keyMap: Record<string, string> = {
-      'groq': 'GROQ_API_KEY',
-      'openai': 'OPENAI_API_KEY',
-      'anthropic': 'ANTHROPIC_API_KEY',
-      'ollama': 'OLLAMA_API_KEY'
+      groq: 'GROQ_API_KEY',
+      openai: 'OPENAI_API_KEY',
+      anthropic: 'ANTHROPIC_API_KEY',
+      ollama: 'OLLAMA_API_KEY',
     };
-    
+
     const envKey = keyMap[provider];
     if (envKey && process.env[envKey]) {
       return process.env[envKey]!;
     }
 
     // 从数据库获取
-    const stmt = this.db.prepare(`SELECT api_keys FROM settings WHERE id = 'default'`);
+    const stmt = this.db.prepare(
+      `SELECT api_keys FROM settings WHERE id = 'default'`
+    );
     const result = stmt.get() as any;
-    
+
     if (result?.api_keys) {
       try {
         const apiKeys = JSON.parse(result.api_keys);
@@ -597,14 +635,16 @@ export class DatabaseManager {
   }
 
   deleteApiKey(provider: string): void {
-    const stmt = this.db.prepare(`SELECT api_keys FROM settings WHERE id = 'default'`);
+    const stmt = this.db.prepare(
+      `SELECT api_keys FROM settings WHERE id = 'default'`
+    );
     const result = stmt.get() as any;
-    
+
     if (result?.api_keys) {
       try {
         const apiKeys = JSON.parse(result.api_keys);
         delete apiKeys[provider];
-        
+
         const updateStmt = this.db.prepare(`
           UPDATE settings SET api_keys = ? WHERE id = 'default'
         `);
@@ -616,27 +656,37 @@ export class DatabaseManager {
   }
 
   // ===== 统计和分析 =====
-  
+
   getStatistics(): DatabaseStats {
-    const totalMeetings = this.db.prepare('SELECT COUNT(*) as count FROM meetings').get() as any;
-    const totalTranscripts = this.db.prepare('SELECT COUNT(*) as count FROM transcripts').get() as any;
-    const totalProcesses = this.db.prepare('SELECT COUNT(*) as count FROM summary_processes').get() as any;
-    const recentActivity = this.db.prepare(`
+    const totalMeetings = this.db
+      .prepare('SELECT COUNT(*) as count FROM meetings')
+      .get() as any;
+    const totalTranscripts = this.db
+      .prepare('SELECT COUNT(*) as count FROM transcripts')
+      .get() as any;
+    const totalProcesses = this.db
+      .prepare('SELECT COUNT(*) as count FROM summary_processes')
+      .get() as any;
+    const recentActivity = this.db
+      .prepare(
+        `
       SELECT created_at FROM meetings 
       ORDER BY created_at DESC 
       LIMIT 1
-    `).get() as any;
+    `
+      )
+      .get() as any;
 
     return {
       totalMeetings: totalMeetings.count,
       totalTranscripts: totalTranscripts.count,
       totalProcesses: totalProcesses.count,
-      recentActivity: recentActivity?.created_at || 'N/A'
+      recentActivity: recentActivity?.created_at || 'N/A',
     };
   }
 
   // ===== 数据备份和恢复 =====
-  
+
   backup(backupPath: string): boolean {
     try {
       const backup = this.db.backup(backupPath);
@@ -656,7 +706,7 @@ export class DatabaseManager {
       // 复制备份文件到当前数据库路径
       const fs = require('fs');
       fs.copyFileSync(backupPath, this.dbPath);
-      
+
       // 重新初始化数据库连接
       this.db = new Database(this.dbPath);
       console.log(`✅ 数据库恢复完成: ${backupPath}`);
@@ -668,7 +718,7 @@ export class DatabaseManager {
   }
 
   // ===== 清理和关闭 =====
-  
+
   close(): void {
     if (this.db) {
       this.db.close();
@@ -682,4 +732,4 @@ export class DatabaseManager {
   }
 }
 
-export default DatabaseManager; 
+export default DatabaseManager;

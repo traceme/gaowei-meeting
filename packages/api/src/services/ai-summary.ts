@@ -1,28 +1,29 @@
 // AI摘要生成服务 - 支持多提供商容错
-import { AppConfig } from '../config/index.js'
+import { AppConfig } from '../config/index.js';
 
 export interface SummaryResult {
-  text: string
-  model: string
-  provider: string
-  createdAt: string
+  text: string;
+  model: string;
+  provider: string;
+  createdAt: string;
 }
 
 export interface SummaryProvider {
-  name: string
-  isAvailable(): Promise<boolean>
-  generateSummary(text: string, prompt: string): Promise<string>
+  name: string;
+  isAvailable(): Promise<boolean>;
+  generateSummary(text: string, prompt: string): Promise<string>;
 }
 
 // Ollama提供商
 export class OllamaProvider implements SummaryProvider {
-  name = 'ollama'
-  private baseURL: string
-  private model: string
+  name = 'ollama';
+  private baseURL: string;
+  private model: string;
 
   constructor(config: AppConfig) {
-    this.baseURL = config.ai.providers.ollama?.baseUrl || 'http://localhost:11434'
-    this.model = 'llama3.2:1b' // 默认模型
+    this.baseURL =
+      config.ai.providers.ollama?.baseUrl || 'http://localhost:11434';
+    this.model = 'llama3.2:1b'; // 默认模型
   }
 
   async isAvailable(): Promise<boolean> {
@@ -30,11 +31,11 @@ export class OllamaProvider implements SummaryProvider {
       const response = await fetch(`${this.baseURL}/api/tags`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
-      })
-      return response.ok
+      });
+      return response.ok;
     } catch (error) {
-      console.log(`Ollama服务不可用: ${error}`)
-      return false
+      console.log(`Ollama服务不可用: ${error}`);
+      return false;
     }
   }
 
@@ -48,7 +49,7 @@ export class OllamaProvider implements SummaryProvider {
         top_p: 0.9,
         num_predict: 1000,
       },
-    }
+    };
 
     const response = await fetch(`${this.baseURL}/api/generate`, {
       method: 'POST',
@@ -56,28 +57,30 @@ export class OllamaProvider implements SummaryProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(request),
-    })
+    });
 
     if (!response.ok) {
-      throw new Error(`Ollama API错误: ${response.status} ${response.statusText}`)
+      throw new Error(
+        `Ollama API错误: ${response.status} ${response.statusText}`
+      );
     }
 
-    const data = await response.json()
-    return data.response
+    const data = await response.json();
+    return data.response;
   }
 }
 
 // OpenAI提供商
 export class OpenAIProvider implements SummaryProvider {
-  name = 'openai'
-  private apiKey: string
+  name = 'openai';
+  private apiKey: string;
 
   constructor(apiKey: string) {
-    this.apiKey = apiKey
+    this.apiKey = apiKey;
   }
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(this.apiKey)
+    return Boolean(this.apiKey);
   }
 
   async generateSummary(text: string, prompt: string): Promise<string> {
@@ -85,7 +88,7 @@ export class OpenAIProvider implements SummaryProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
@@ -98,29 +101,31 @@ export class OpenAIProvider implements SummaryProvider {
         max_tokens: 1000,
         temperature: 0.7,
       }),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(`OpenAI API错误: ${response.status} ${errorData.error?.message || response.statusText}`)
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `OpenAI API错误: ${response.status} ${errorData.error?.message || response.statusText}`
+      );
     }
 
-    const data = await response.json()
-    return data.choices[0]?.message?.content || '摘要生成失败'
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '摘要生成失败';
   }
 }
 
 // Claude提供商
 export class ClaudeProvider implements SummaryProvider {
-  name = 'claude'
-  private apiKey: string
+  name = 'claude';
+  private apiKey: string;
 
   constructor(apiKey: string) {
-    this.apiKey = apiKey
+    this.apiKey = apiKey;
   }
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(this.apiKey)
+    return Boolean(this.apiKey);
   }
 
   async generateSummary(text: string, prompt: string): Promise<string> {
@@ -141,84 +146,97 @@ export class ClaudeProvider implements SummaryProvider {
           },
         ],
       }),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(`Claude API错误: ${response.status} ${errorData.error?.message || response.statusText}`)
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Claude API错误: ${response.status} ${errorData.error?.message || response.statusText}`
+      );
     }
 
-    const data = await response.json()
-    return data.content[0]?.text || '摘要生成失败'
+    const data = await response.json();
+    return data.content[0]?.text || '摘要生成失败';
   }
 }
 
 // AI摘要生成器
 export class AISummaryGenerator {
-  private providers: SummaryProvider[] = []
-  private readonly AI_TIMEOUT_MS = 1800000 // 30分钟超时
+  private providers: SummaryProvider[] = [];
+  private readonly AI_TIMEOUT_MS = 1800000; // 30分钟超时
 
   constructor(config: AppConfig) {
     // 添加Ollama提供商
-    this.providers.push(new OllamaProvider(config))
+    this.providers.push(new OllamaProvider(config));
 
     // 添加OpenAI提供商（如果有API密钥）
     if (config.ai.providers.openai?.apiKey) {
-      this.providers.push(new OpenAIProvider(config.ai.providers.openai.apiKey))
+      this.providers.push(
+        new OpenAIProvider(config.ai.providers.openai.apiKey)
+      );
     }
 
     // 添加Claude提供商（如果有API密钥）
     if (config.ai.providers.anthropic?.apiKey) {
-      this.providers.push(new ClaudeProvider(config.ai.providers.anthropic.apiKey))
+      this.providers.push(
+        new ClaudeProvider(config.ai.providers.anthropic.apiKey)
+      );
     }
   }
 
-  async generateSummary(transcriptText: string, model?: string): Promise<SummaryResult> {
-    const prompt = this.createSummaryPrompt(transcriptText)
+  async generateSummary(
+    transcriptText: string,
+    model?: string
+  ): Promise<SummaryResult> {
+    const prompt = this.createSummaryPrompt(transcriptText);
 
-    let lastError: Error | null = null
+    let lastError: Error | null = null;
 
     // 尝试多个AI服务提供商，按优先级顺序
     for (const provider of this.providers) {
       try {
         if (await provider.isAvailable()) {
-          console.log(`🤖 尝试使用 ${provider.name} 生成摘要...`)
-          
+          console.log(`🤖 尝试使用 ${provider.name} 生成摘要...`);
+
           const result = await Promise.race([
             provider.generateSummary(transcriptText, prompt),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error(`${provider.name} 超时`)), this.AI_TIMEOUT_MS)
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`${provider.name} 超时`)),
+                this.AI_TIMEOUT_MS
+              )
             ),
-          ])
-          
-          console.log(`✅ ${provider.name} 摘要生成成功`)
-          
+          ]);
+
+          console.log(`✅ ${provider.name} 摘要生成成功`);
+
           return {
             text: result,
             model: model || 'default',
             provider: provider.name,
             createdAt: new Date().toISOString(),
-          }
+          };
         } else {
-          console.log(`⚠️ ${provider.name} 不可用，跳过`)
+          console.log(`⚠️ ${provider.name} 不可用，跳过`);
         }
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(`${provider.name} 失败`)
-        console.warn(`❌ ${provider.name} 摘要生成失败:`, lastError.message)
-        continue // 尝试下一个提供商
+        lastError =
+          error instanceof Error ? error : new Error(`${provider.name} 失败`);
+        console.warn(`❌ ${provider.name} 摘要生成失败:`, lastError.message);
+        continue; // 尝试下一个提供商
       }
     }
 
     // 所有提供商都失败了，返回默认摘要
-    console.error('所有AI服务提供商都失败了，返回基础摘要')
-    const fallbackSummary = this.generateFallbackSummary(transcriptText)
-    
+    console.error('所有AI服务提供商都失败了，返回基础摘要');
+    const fallbackSummary = this.generateFallbackSummary(transcriptText);
+
     return {
       text: fallbackSummary,
       model: 'fallback',
       provider: 'fallback',
       createdAt: new Date().toISOString(),
-    }
+    };
   }
 
   private createSummaryPrompt(transcriptText: string): string {
@@ -250,17 +268,19 @@ export class AISummaryGenerator {
 - 主要参与者：[从内容推断]
 - 讨论主题：[主要话题]
 
-请用简洁明了的简体中文回答，重点突出最重要的信息。`
+请用简洁明了的简体中文回答，重点突出最重要的信息。`;
   }
 
   private generateFallbackSummary(transcriptText: string): string {
     // 基础摘要生成逻辑
-    const wordCount = transcriptText.length
-    const estimatedDuration = Math.max(1, Math.round(wordCount / 150)) // 估算阅读时间
-    
+    const wordCount = transcriptText.length;
+    const estimatedDuration = Math.max(1, Math.round(wordCount / 150)); // 估算阅读时间
+
     // 简单提取前几句作为摘要
-    const sentences = transcriptText.split(/[。！？.!?]/).filter(s => s.trim().length > 10)
-    const keySentences = sentences.slice(0, 3).join('。') + '。'
+    const sentences = transcriptText
+      .split(/[。！？.!?]/)
+      .filter(s => s.trim().length > 10);
+    const keySentences = sentences.slice(0, 3).join('。') + '。';
 
     return `## 📋 会议摘要（基础版本）
 
@@ -272,19 +292,21 @@ ${keySentences}
 - 估算时长：${estimatedDuration} 分钟
 - 摘要生成时间：${new Date().toLocaleString('zh-CN')}
 
-*注：此为基础摘要，建议配置AI服务获得更详细的分析结果。*`
+*注：此为基础摘要，建议配置AI服务获得更详细的分析结果。*`;
   }
 
-  async getProviderStatus(): Promise<Array<{ name: string; available: boolean }>> {
-    const status = []
+  async getProviderStatus(): Promise<
+    Array<{ name: string; available: boolean }>
+  > {
+    const status = [];
     for (const provider of this.providers) {
       try {
-        const available = await provider.isAvailable()
-        status.push({ name: provider.name, available })
+        const available = await provider.isAvailable();
+        status.push({ name: provider.name, available });
       } catch (error) {
-        status.push({ name: provider.name, available: false })
+        status.push({ name: provider.name, available: false });
       }
     }
-    return status
+    return status;
   }
-} 
+}

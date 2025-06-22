@@ -3,11 +3,13 @@
 ## 📋 快速设置步骤
 
 ### 1. 获取OpenAI API密钥
+
 1. 访问 [OpenAI Platform](https://platform.openai.com/api-keys)
 2. 创建新的API密钥
 3. 复制密钥备用
 
 ### 2. 配置环境变量
+
 ```bash
 # 创建环境变量文件
 cp .env.example .env
@@ -17,11 +19,13 @@ nano .env
 ```
 
 在`.env`文件中添加：
+
 ```bash
 OPENAI_API_KEY=sk-your-openai-api-key-here
 ```
 
 ### 3. 更新前端配置
+
 在`frontend/src/app/page.tsx`中找到`modelConfig`的初始化（约第81行），修改为：
 
 ```typescript
@@ -29,11 +33,12 @@ const [modelConfig, setModelConfig] = useState<ModelConfig>({
   provider: 'openai', // 默认使用OpenAI
   model: 'gpt-4o-mini', // 默认使用更便宜的模型
   whisperModel: 'large-v3',
-  whisperLanguage: 'auto'
+  whisperLanguage: 'auto',
 });
 ```
 
 同时更新`modelOptions`（约第94行）：
+
 ```typescript
 const modelOptions = {
   openai: ['gpt-4o-mini', 'gpt-4o', 'o1-preview', 'o1-mini', 'gpt-3.5-turbo'],
@@ -44,6 +49,7 @@ const modelOptions = {
 ```
 
 ### 4. 重启服务
+
 ```bash
 # 停止当前服务
 docker-compose down
@@ -61,6 +67,7 @@ docker-compose ps
 ## 🧪 测试AI摘要功能
 
 ### 1. 测试服务连接
+
 ```bash
 # 检查摘要服务健康状态
 curl http://localhost:5167/health
@@ -70,6 +77,7 @@ curl http://localhost:5167/health
 ```
 
 ### 2. 测试AI摘要生成
+
 ```bash
 curl -X POST http://localhost:5167/process-transcript \
   -H "Content-Type: application/json" \
@@ -88,19 +96,23 @@ curl http://localhost:5167/get-summary/YOUR_PROCESS_ID
 ### 推荐配置（按成本效益排序）：
 
 1. **gpt-4o-mini** ⭐ 推荐
+
    - 成本最低，速度最快
    - 适合大多数会议摘要任务
    - 性价比最高
 
 2. **gpt-3.5-turbo**
+
    - 成本较低，速度快
    - 适合简单的摘要任务
 
 3. **gpt-4o**
+
    - 质量更高，成本中等
    - 适合重要会议或复杂内容
 
 4. **o1-mini**
+
    - 推理能力强，适合复杂分析
    - 成本较高，处理时间较长
 
@@ -111,7 +123,9 @@ curl http://localhost:5167/get-summary/YOUR_PROCESS_ID
 ## 🔧 故障排除
 
 ### 问题1：健康检查显示"no_api_key"
+
 **解决方案**：
+
 ```bash
 # 检查环境变量是否正确设置
 docker exec meeting-minutes-summary-server-1 env | grep OPENAI
@@ -123,7 +137,9 @@ docker-compose up -d
 ```
 
 ### 问题2：API请求失败
+
 **解决方案**：
+
 ```bash
 # 检查API密钥是否有效
 curl https://api.openai.com/v1/models \
@@ -135,7 +151,9 @@ curl https://api.openai.com/v1/usage \
 ```
 
 ### 问题3：摘要质量不理想
+
 **解决方案**：
+
 1. 尝试更高级的模型（gpt-4o）
 2. 检查转录文字质量
 3. 确保语言设置正确（中文内容选择中文）
@@ -143,6 +161,7 @@ curl https://api.openai.com/v1/usage \
 ## 📊 使用统计
 
 启用OpenAI API后，你可以在OpenAI Dashboard中查看：
+
 - API使用量
 - 成本统计
 - 请求日志
@@ -150,6 +169,7 @@ curl https://api.openai.com/v1/usage \
 ## 🔒 安全提醒
 
 1. **API密钥安全**：
+
    - 不要将API密钥提交到版本控制
    - 定期轮换API密钥
    - 设置使用限制
@@ -161,9 +181,11 @@ curl https://api.openai.com/v1/usage \
 ## 🚀 高级配置
 
 ### 自定义提示词
+
 如需修改摘要格式，编辑`backend/summary-server/app.py`中的`prompt`变量。
 
 ### 添加其他提供商
+
 代码已支持扩展到其他AI提供商，如Anthropic Claude或Google Gemini。
 
 ---

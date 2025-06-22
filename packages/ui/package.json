@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint src/**/*.{ts,tsx}",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -43,4 +43,4 @@
   "publishConfig": {
     "access": "public"
   }
-} 
+}

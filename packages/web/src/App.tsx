@@ -1,55 +1,44 @@
-import React from 'react';
+// React 17+ 不需要导入 React
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Layout, Button } from '@gaowei/ui';
-import { HomePage } from './pages/HomePage';
-import { HistoryPage } from './pages/HistoryPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { useApiStatus } from './hooks/useApiStatus';
+import './App.css';
+import Layout from './components/Layout';
+import HomePage from './pages/HomePage';
+import UploadPage from './pages/UploadPage';
+import HistoryPage from './pages/HistoryPage';
+import SettingsPage from './pages/SettingsPage';
 
 // 404页面
 function NotFoundPage() {
   return (
-    <div className="max-w-4xl mx-auto p-6 text-center">
-      <div className="text-6xl mb-4">🔍</div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">页面未找到</h1>
-      <p className="text-lg text-gray-600 mb-8">
-        抱歉，您访问的页面不存在。
-      </p>
-      <Button onClick={() => window.location.href = '/'}>
+    <div className='max-w-4xl mx-auto p-6 text-center'>
+      <div className='text-6xl mb-4'>🔍</div>
+      <h1 className='text-3xl font-bold text-gray-900 mb-4'>页面未找到</h1>
+      <p className='text-lg text-gray-600 mb-8'>抱歉，您访问的页面不存在。</p>
+      <a 
+        href="/" 
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-block"
+      >
         返回首页
-      </Button>
+      </a>
     </div>
   );
 }
 
 // 主应用组件
 function App() {
-  const { isOnline } = useApiStatus();
-
-  const navItems = [
-    { path: '/', label: '首页', icon: '🏠' },
-    { path: '/history', label: '会议历史', icon: '📊' },
-    { path: '/settings', label: '设置', icon: '⚙️' },
-  ];
-
   return (
     <Router>
-      <Layout
-        title="高维会议AI"
-        showStatus={true}
-        statusText={isOnline ? 'API已连接' : 'API断开'}
-        statusColor={isOnline ? 'green' : 'red'}
-        navItems={navItems}
-      >
+      <Layout>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFoundPage />} />
+          <Route path='/' element={<HomePage />} />
+          <Route path='/upload' element={<UploadPage />} />
+          <Route path='/history' element={<HistoryPage />} />
+          <Route path='/settings' element={<SettingsPage />} />
+          <Route path='*' element={<NotFoundPage />} />
         </Routes>
       </Layout>
     </Router>
   );
 }
 
-export default App; 
+export default App;

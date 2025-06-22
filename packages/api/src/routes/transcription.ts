@@ -1,0 +1,275 @@
+import { Router, type Request, type Response } from 'express';
+import type { IRouter } from 'express';
+import { readFile } from 'fs/promises';
+import FormData from 'form-data';
+import axios from 'axios';
+import { MeetingManager } from '../services/meeting.js';
+import {
+  TranscriptionRouter,
+  type TranscriptionOptions,
+} from '../services/transcription.js';
+import { appConfig } from '../config/index.js';
+import { sendSuccess, sendError } from '../middleware/index.js';
+
+const router: IRouter = Router();
+let meetingManager: MeetingManager;
+let transcriptionRouter: TranscriptionRouter;
+
+// 初始化服务
+const initializeServices = () => {
+  if (!meetingManager) {
+    meetingManager = new MeetingManager();
+  }
+  if (!transcriptionRouter) {
+    transcriptionRouter = new TranscriptionRouter(appConfig);
+  }
+  return { meetingManager, transcriptionRouter };
+};
+
+// 文件上传和转录
+router.post('/upload', async (req: Request, res: Response) => {
+  try {
+    const { meetingManager } = initializeServices();
+
+    if (!req.file) {
+      return sendError(res, '未上传文件', 400);
+    }
+
+    const { meetingId, language } = req.body;
+    let currentMeetingId = meetingId;
+
+    // 如果没有提供会议ID，创建新会议
+    if (!currentMeetingId) {
+      const meeting = await meetingManager.createMeeting(
+        `会议转录 - ${req.file.originalname}`,
+        `上传文件: ${req.file.originalname}`
+      );
+      currentMeetingId = meeting.id;
+    }
+
+    // 创建转录任务
+    const task = await meetingManager.createTranscriptionTask(
+      currentMeetingId,
+      req.file.originalname
+    );
+
+    // 更新会议状态
+    await meetingManager.updateMeeting(currentMeetingId, {
+      status: 'transcribing',
+      audioPath: req.file.path,
+    });
+
+    // 开始异步转录
+    processTranscriptionInBackground(
+      task.id,
+      req.file.path, // 使用文件路径而不是buffer
+      req.file.originalname,
+      {
+        language: language as string,
+      }
+    );
+
+    sendSuccess(res, {
+      message: '文件上传成功，转录已开始',
+      meetingId: currentMeetingId,
+      taskId: task.id,
+    });
+  } catch (error) {
+    sendError(
+      res,
+      error instanceof Error ? error.message : '文件上传失败',
+      500
+    );
+  }
+});
+
+// 转录状态查询
+router.get('/:taskId', async (req: Request, res: Response) => {
+  try {
+    const { meetingManager } = initializeServices();
+    const task = await meetingManager.getTranscriptionTask(req.params.taskId!);
+
+    if (!task) {
+      return sendError(res, '转录任务不存在', 404);
+    }
+
+    sendSuccess(res, { task });
+  } catch (error) {
+    sendError(
+      res,
+      error instanceof Error ? error.message : '获取转录状态失败',
+      500
+    );
+  }
+});
+
+// 获取转录引擎状态
+router.get('/engines/status', async (req: Request, res: Response) => {
+  try {
+    const { transcriptionRouter } = initializeServices();
+    const status = await transcriptionRouter.getEngineStatus();
+
+    sendSuccess(res, { engines: status });
+  } catch (error) {
+    sendError(
+      res,
+      error instanceof Error ? error.message : '获取引擎状态失败',
+      500
+    );
+  }
+});
+
+// 后台转录处理函数
+async function processTranscriptionInBackground(
+  taskId: string,
+  audioFilePath: string,
+  filename: string,
+  options: TranscriptionOptions
+) {
+  const { meetingManager, transcriptionRouter } = initializeServices();
+
+  try {
+    // 更新任务状态为进行中
+    await meetingManager.updateTranscriptionTask(taskId, {
+      status: 'processing',
+      progress: 5,
+    });
+
+    // 读取音频文件
+    const audioBuffer = await readFile(audioFilePath);
+    
+    console.log(`🎙️ 开始转录任务 ${taskId}...`);
+    
+    // 检查是否使用本地Whisper服务
+    const whisperServerUrl = appConfig.whisper.serverUrl || 'http://localhost:8178';
+    
+    try {
+      // 发送转录请求到Whisper服务
+      const formData = new FormData();
+      formData.append('file', audioBuffer, {
+        filename: filename,
+        contentType: 'audio/wav',
+      });
+      
+      if (options.language) {
+        formData.append('language', options.language);
+      }
+
+      const response = await axios.post(`${whisperServerUrl}/inference`, formData, {
+        headers: formData.getHeaders(),
+      });
+
+      if (!response.data) {
+        throw new Error(`Whisper服务响应错误: ${response.status} ${response.statusText}`);
+      }
+
+      const whisperResult = response.data;
+      const whisperTaskId = whisperResult.task_id;
+
+      if (whisperTaskId) {
+        console.log(`📋 Whisper任务ID: ${whisperTaskId}, 开始轮询进度...`);
+        
+        // 轮询Whisper服务的进度
+        const maxAttempts = 300; // 5分钟超时
+        let attempts = 0;
+        
+        while (attempts < maxAttempts) {
+          try {
+            const statusResponse = await axios.get(`${whisperServerUrl}/status/${whisperTaskId}`);
+            
+            if (statusResponse.data) {
+              const status = statusResponse.data;
+              
+              // 更新数据库中的进度
+              if (status.progress !== undefined) {
+                await meetingManager.updateTranscriptionTask(taskId, {
+                  status: 'processing',
+                  progress: Math.min(status.progress, 99), // 最高99%，留1%给最终处理
+                });
+                console.log(`📊 任务 ${taskId} 进度更新: ${status.progress}%`);
+              }
+              
+              if (status.status === 'completed' && status.result) {
+                // 转录完成，处理结果
+                const result = {
+                  text: status.result.text || '',
+                  language: status.result.language || 'unknown',
+                  duration: status.result.duration || 0,
+                  confidence: 0.95,
+                  segments: status.result.segments || [],
+                };
+                
+                // 更新任务状态为完成
+                await meetingManager.updateTranscriptionTask(taskId, {
+                  status: 'completed',
+                  progress: 100,
+                  result: result,
+                });
+                
+                console.log(`✅ 转录任务 ${taskId} 完成`);
+                return;
+              }
+              
+              if (status.status === 'error') {
+                throw new Error(`Whisper转录失败: ${status.error || '未知错误'}`);
+              }
+            }
+          } catch (pollError) {
+            console.warn(`⚠️ 轮询进度失败 (尝试 ${attempts + 1}):`, pollError);
+          }
+          
+          // 等待1秒后继续轮询
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+        }
+        
+        throw new Error('转录任务超时');
+      } else {
+        // 直接返回结果的情况（同步处理）
+        const result = {
+          text: whisperResult.text || '',
+          language: whisperResult.language || 'unknown',
+          duration: whisperResult.duration || 0,
+          confidence: 0.95,
+          segments: whisperResult.segments || [],
+        };
+        
+        await meetingManager.updateTranscriptionTask(taskId, {
+          status: 'completed',
+          progress: 100,
+          result: result,
+        });
+        
+        console.log(`✅ 转录任务 ${taskId} 完成（同步）`);
+      }
+    } catch (whisperError) {
+      console.warn('⚠️ Whisper服务不可用，使用备用转录引擎...');
+      
+      // 使用备用转录引擎
+      const result = await transcriptionRouter.transcribe(
+        audioBuffer,
+        filename,
+        options
+      );
+
+      await meetingManager.updateTranscriptionTask(taskId, {
+        status: 'completed',
+        progress: 100,
+        result: result,
+      });
+
+      console.log(`✅ 转录任务 ${taskId} 完成（备用引擎）`);
+    }
+
+  } catch (error) {
+    // 更新任务状态为失败
+    await meetingManager.updateTranscriptionTask(taskId, {
+      status: 'error',
+      error: error instanceof Error ? error.message : '转录失败',
+    });
+
+    console.error(`❌ 转录任务 ${taskId} 失败:`, error);
+  }
+}
+
+export default router;

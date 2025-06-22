@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端上传调试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 前端上传功能调试</h1>
+        
+        <div>
+            <input type="file" id="fileInput" accept="audio/*">
+            <button onclick="testUpload()">🚀 测试上传</button>
+            <button onclick="clearLog()">🧹 清空日志</button>
+        </div>
+        
+        <div class="progress" id="progressContainer" style="display: none;">
+            <div class="progress-bar" id="progressBar" style="width: 0%;"></div>
+        </div>
+        <div id="progressText" style="display: none;"></div>
+        
+        <div class="log" id="logContainer"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d';
+            container.innerHTML += `<div style="color: ${color};">[${timestamp}] ${message}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '';
+        }
+        
+        function updateProgress(percent) {
+            const container = document.getElementById('progressContainer');
+            const bar = document.getElementById('progressBar');
+            const text = document.getElementById('progressText');
+            
+            if (percent === null) {
+                container.style.display = 'none';
+                text.style.display = 'none';
+            } else {
+                container.style.display = 'block';
+                text.style.display = 'block';
+                bar.style.width = percent + '%';
+                text.textContent = `上传进度: ${percent}%`;
+            }
+        }
+        
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('❌ 请先选择文件', 'error');
+                return;
+            }
+            
+            log(`🚀 开始上传文件: ${file.name} (${file.size} bytes)`);
+            updateProgress(0);
+            
+            try {
+                // 1. 测试健康检查
+                log('🔍 检查API健康状态...');
+                const healthResponse = await fetch('/api/health');
+                if (!healthResponse.ok) {
+                    throw new Error(`健康检查失败: ${healthResponse.status}`);
+                }
+                const healthData = await healthResponse.json();
+                log(`✅ API健康检查通过: ${JSON.stringify(healthData)}`, 'success');
+                
+                // 2. 准备上传
+                log('📤 准备上传文件...');
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // 3. 发送上传请求
+                log('📡 发送上传请求到 /api/transcription/upload');
+                const uploadResponse = await fetch('/api/transcription/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                log(`📨 上传响应状态: ${uploadResponse.status} ${uploadResponse.statusText}`);
+                
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
+                    log(`❌ 上传失败: ${errorText}`, 'error');
+                    updateProgress(null);
+                    return;
+                }
+                
+                const uploadResult = await uploadResponse.json();
+                log(`✅ 上传成功: ${JSON.stringify(uploadResult)}`, 'success');
+                
+                // 4. 获取任务ID
+                const taskId = uploadResult.data?.taskId || uploadResult.taskId;
+                if (!taskId) {
+                    log(`❌ 响应中缺少任务ID: ${JSON.stringify(uploadResult)}`, 'error');
+                    updateProgress(null);
+                    return;
+                }
+                
+                log(`🆔 任务ID: ${taskId}`);
+                
+                // 5. 开始轮询状态
+                log('🔄 开始轮询任务状态...');
+                await pollStatus(taskId);
+                
+            } catch (error) {
+                log(`❌ 上传过程出错: ${error.message}`, 'error');
+                updateProgress(null);
+            }
+        }
+        
+        async function pollStatus(taskId) {
+            let attempts = 0;
+            const maxAttempts = 30;
+            
+            const poll = async () => {
+                try {
+                    attempts++;
+                    log(`📊 轮询尝试 ${attempts}/${maxAttempts}: /api/transcription/${taskId}`);
+                    
+                    const response = await fetch(`/api/transcription/${taskId}`);
+                    log(`📨 轮询响应: ${response.status} ${response.statusText}`);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        log(`❌ 轮询失败: ${errorText}`, 'error');
+                        throw new Error(`轮询失败: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    log(`📋 轮询结果: ${JSON.stringify(result)}`);
+                    
+                    const task = result.data?.task || result.task || result;
+                    if (!task) {
+                        log(`❌ 响应中缺少任务数据: ${JSON.stringify(result)}`, 'error');
+                        return;
+                    }
+                    
+                    const status = task.status;
+                    const progress = task.progress || 0;
+                    
+                    log(`📈 任务状态: ${status}, 进度: ${progress}%`);
+                    updateProgress(progress);
+                    
+                    if (status === 'completed') {
+                        log(`🎉 转录完成!`, 'success');
+                        if (task.result) {
+                            log(`📝 转录结果: ${task.result.text}`, 'success');
+                        }
+                        updateProgress(100);
+                        return;
+                    }
+                    
+                    if (status === 'error') {
+                        log(`❌ 转录失败: ${task.error}`, 'error');
+                        updateProgress(null);
+                        return;
+                    }
+                    
+                    // 继续轮询
+                    if (attempts < maxAttempts) {
+                        setTimeout(poll, 2000);
+                    } else {
+                        log(`⏰ 轮询超时`, 'error');
+                        updateProgress(null);
+                    }
+                    
+                } catch (error) {
+                    log(`❌ 轮询出错: ${error.message}`, 'error');
+                    if (attempts < maxAttempts) {
+                        setTimeout(poll, 3000);
+                    } else {
+                        updateProgress(null);
+                    }
+                }
+            };
+            
+            // 开始轮询
+            setTimeout(poll, 1000);
+        }
+    </script>
+</body>
+</html> 

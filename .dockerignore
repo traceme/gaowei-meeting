@@ -1,0 +1,89 @@
+# 依赖文件
+node_modules
+packages/*/node_modules
+**/node_modules
+
+# 构建输出
+dist
+build
+.next
+.turbo
+.vite
+
+# 开发文件
+.env.local
+.env.development
+.env.test
+*.log
+logs
+*.log.*
+
+# 版本控制
+.git
+.gitignore
+.gitattributes
+
+# IDE和编辑器
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage
+.nyc_output
+test-results
+
+# 临时文件
+tmp
+temp
+.tmp
+.temp
+
+# 文档和说明
+*.md
+docs/
+!README.md
+
+# 配置文件（开发相关）
+.eslintcache
+.prettierignore
+.commitlintrc.js
+
+# 部署相关
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# 备份和旧版本
+*.bak
+*.old
+*~
+.taskmaster.bak
+meeting-minutes
+transcript-seeker
+src
+
+# 测试文件
+__tests__
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+test/
+tests/
+
+# 数据文件（开发环境）
+uploads/
+data/
+*.db
+*.sqlite
+
+# 其他
+.github
+.husky 

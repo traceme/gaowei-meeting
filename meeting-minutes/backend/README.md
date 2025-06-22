@@ -3,12 +3,14 @@
 FastAPI backend for meeting transcription and analysis
 
 ## Features
+
 - Audio file upload and storage
 - Real-time Whisper-based transcription with streaming support
 - Meeting analysis with LLMs (supports Claude, Groq, and Ollama)
 - REST API endpoints
 
 ## Requirements
+
 - Python 3.9+
 - FFmpeg
 - C++ compiler (for Whisper.cpp)
@@ -23,27 +25,33 @@ FastAPI backend for meeting transcription and analysis
 ### Prerequisites Installation
 
 #### For Windows:
+
 1. **Python 3.9+**:
+
    - Download and install from [Python.org](https://www.python.org/downloads/)
    - Ensure you check "Add Python to PATH" during installation
    - Verify installation: `python --version`
 
 2. **FFmpeg**:
+
    - Download from [FFmpeg.org](https://ffmpeg.org/download.html) or install via [Chocolatey](https://chocolatey.org/): `choco install ffmpeg`
    - Add FFmpeg to your PATH environment variable
    - Verify installation: `ffmpeg -version`
 
 3. **C++ Compiler**:
+
    - Install Visual Studio Build Tools from [Microsoft](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
    - Select "Desktop development with C++" workload during installation
    - Verify installation: `cl` (should show the compiler version)
 
 4. **CMake**:
+
    - Download and install from [CMake.org](https://cmake.org/download/)
    - Ensure you select "Add CMake to the system PATH" during installation
    - Verify installation: `cmake --version`
 
 5. **Git**:
+
    - Download and install from [Git-scm.com](https://git-scm.com/download/win)
    - Verify installation: `git --version`
 
@@ -54,24 +62,30 @@ FastAPI backend for meeting transcription and analysis
    - Verify installation: `ollama list`
 
 #### For macOS:
+
 1. **Python 3.9+**:
+
    - Install via Homebrew: `brew install python@3.9`
    - Or download from [Python.org](https://www.python.org/downloads/)
    - Verify installation: `python3 --version`
 
 2. **FFmpeg**:
+
    - Install via Homebrew: `brew install ffmpeg`
    - Verify installation: `ffmpeg -version`
 
 3. **C++ Compiler**:
+
    - Install Xcode Command Line Tools: `xcode-select --install`
    - Verify installation: `clang --version`
 
 4. **CMake**:
+
    - Install via Homebrew: `brew install cmake`
    - Verify installation: `cmake --version`
 
 5. **Git**:
+
    - Install via Homebrew: `brew install git`
    - Or install Xcode Command Line Tools: `xcode-select --install`
    - Verify installation: `git --version`
@@ -83,18 +97,19 @@ FastAPI backend for meeting transcription and analysis
    - Pull required models: `ollama pull mistral` (or your preferred model)
    - Verify installation: `ollama list`
 
-
-
 ### 2. Python Dependencies
+
 Install Python dependencies:
 
 #### For Windows:
+
 ```cmd
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
 #### For macOS:
+
 ```bash
 python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
@@ -103,7 +118,9 @@ python3 -m pip install -r requirements.txt
 ### 3. Build Whisper Server
 
 #### For Windows:
+
 Run the build script which will:
+
 - Initialize and update git submodules
 - Build Whisper.cpp with custom server modifications
 - Set up the server package with required files
@@ -116,11 +133,13 @@ Run the build script which will:
 If no model is specified, the script will prompt you to choose one interactively.
 
 #### For macOS:
+
 ```bash
 ./build_whisper.sh
 ```
 
 If you encounter permission issues, make the script executable:
+
 ```bash
 chmod +x build_whisper.sh
 ./build_whisper.sh
@@ -129,6 +148,7 @@ chmod +x build_whisper.sh
 ### 4. Running the Server
 
 #### For Windows:
+
 The PowerShell script provides an interactive way to start the backend services:
 
 ```cmd
@@ -136,11 +156,13 @@ The PowerShell script provides an interactive way to start the backend services:
 ```
 
 Or directly with PowerShell:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File start_with_output.ps1
 ```
 
 The script will:
+
 1. Check and clean up any existing processes
 2. Display available models and prompt for selection
 3. Download the selected model if not present
@@ -150,33 +172,40 @@ The script will:
 To stop all services, close the command windows or press Ctrl+C in each window.
 
 #### For macOS:
+
 ```bash
 ./clean_start_backend.sh
 ```
 
 If you encounter permission issues:
+
 ```bash
 chmod +x clean_start_backend.sh
 ./clean_start_backend.sh
 ```
 
 To stop all services on macOS, press Ctrl+C in the terminal or use:
+
 ```bash
 pkill -f "whisper-server"
 pkill -f "uvicorn main:app"
 ```
 
 ## API Documentation
+
 Access Swagger UI at `http://localhost:5167/docs`
 
 ## Services
+
 The backend runs two services:
+
 1. Whisper.cpp Server: Handles real-time audio transcription
 2. FastAPI Backend: Manages API endpoints, LLM integration, and data storage
 
 ## Platform-Specific Information
 
 ### Windows
+
 - The Windows scripts create separate command windows for each service, allowing you to see the output in real-time
 - You can check the status of services using `check_status.cmd`
 - If you prefer to start services individually:
@@ -184,6 +213,7 @@ The backend runs two services:
   - `start_python_backend.cmd [port]` - Starts just the Python backend
 
 ### macOS
+
 - The macOS scripts run services in the foreground by default
 - To run services in the background, you can use:
   ```bash
@@ -196,6 +226,7 @@ The backend runs two services:
 ## Troubleshooting
 
 ### Common Issues on Windows
+
 - If you see "whisper-server.exe not found", run `build_whisper.cmd` first
 - If a model fails to download, try running `download-ggml-model.cmd [model]` directly
 - If services don't start, check if ports 8178 (Whisper) and 5167 (Backend) are available
@@ -209,6 +240,7 @@ The backend runs two services:
 - If CMake can't find the compiler, ensure Visual Studio Build Tools are properly installed and PATH variables are set
 
 ### Common Issues on macOS
+
 - If scripts fail with "Permission denied", run `chmod +x script_name.sh` to make them executable
 - If you see "command not found: python", use `python3` instead
 - If building Whisper fails with compiler errors, ensure Xcode Command Line Tools are installed
@@ -227,6 +259,7 @@ The backend runs two services:
 - For M1/M2 Macs, ensure you're using ARM-compatible versions of software
 
 ### General Troubleshooting
+
 - If services fail to start, the script will automatically clean up processes
 - Check logs for detailed error messages
 - Ensure all ports (5167 for backend, 8178 for Whisper) are available

@@ -64,12 +64,15 @@ Before starting work on a new feature or bug fix:
 
 ```markdown
 ## Description
+
 [Describe your changes here]
 
 ## Related Issue
+
 [Link to the issue this PR addresses]
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Documentation update
@@ -78,15 +81,18 @@ Before starting work on a new feature or bug fix:
 - [ ] Other (please describe)
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Manual testing performed
 - [ ] All tests pass
 
 ## Documentation
+
 - [ ] Documentation updated
 - [ ] No documentation needed
 
 ## Checklist
+
 - [ ] Code follows project style
 - [ ] Self-reviewed the code
 - [ ] Added comments for complex code
@@ -112,6 +118,7 @@ Before starting work on a new feature or bug fix:
 ```
 
 Types:
+
 - feat: New feature
 - fix: Bug fix
 - docs: Documentation changes
@@ -149,4 +156,4 @@ Types:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's MIT License. 
+By contributing, you agree that your contributions will be licensed under the project's MIT License.

@@ -9,6 +9,10 @@ build/
 .next/
 out/
 
+# Turbo monorepo cache (新增)
+.turbo/
+**/.turbo/
+
 # Runtime data
 pids
 *.pid
@@ -138,20 +142,42 @@ lerna-debug.log*
 uploads/
 temp-audio/
 
-# Database files
+# Database files (新增具体的数据库文件)
 *.db
 *.sqlite
 *.sqlite3
+*.db-wal
+*.db-shm
+packages/api/data/
 
-# AI model files
+# AI model files (新增具体路径)
 models/
 *.bin
 *.gguf
+packages/whisper-engine/**/models/
+!packages/whisper-engine/**/models/.gitkeep
 
 # Backup files
 *.backup
+*.backups
 *.bak
 
 # Taskmaster files
 .taskmaster/tasks/
 .windsurfrules
+
+dev-debug.log
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

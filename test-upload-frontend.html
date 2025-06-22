@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高维会议AI - 上传测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ 高维会议AI - 上传测试</h1>
+        <p>测试前端文件上传和转录功能</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📤 拖拽音频文件到这里，或点击选择文件</p>
+            <p style="color: #666; font-size: 14px;">支持 MP3, WAV, M4A, WEBM, OGG, FLAC 格式</p>
+            <input type="file" id="fileInput" accept="audio/*" style="display: none;">
+            <button class="btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+        </div>
+        
+        <div id="fileInfo" style="display: none;">
+            <h3>已选择文件:</h3>
+            <p id="fileName"></p>
+            <p id="fileSize"></p>
+            <button class="btn" id="uploadBtn" onclick="uploadFile()">开始上传转录</button>
+            <button class="btn" onclick="clearFile()" style="background: #6c757d;">清除</button>
+        </div>
+        
+        <div id="uploadProgress" style="display: none;">
+            <h3>上传进度:</h3>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+            <p id="progressText">准备上传...</p>
+        </div>
+        
+        <div id="statusMessages"></div>
+        
+        <div id="transcriptionResult" style="display: none;">
+            <h3>转录结果:</h3>
+            <div class="result" id="resultText"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let currentTaskId = null;
+        let pollInterval = null;
+
+        // 文件选择和拖拽处理
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            // 检查文件类型
+            const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/webm', 'audio/ogg', 'audio/flac'];
+            const allowedExtensions = ['mp3', 'wav', 'm4a', 'webm', 'ogg', 'flac'];
+            
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            const isValidType = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+            
+            if (!isValidType) {
+                showStatus('error', '不支持的文件类型。请选择音频文件 (MP3, WAV, M4A, WEBM, OGG, FLAC)');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('fileName').textContent = `文件名: ${file.name}`;
+            document.getElementById('fileSize').textContent = `大小: ${formatFileSize(file.size)}`;
+            document.getElementById('fileInfo').style.display = 'block';
+            showStatus('info', '文件已选择，点击"开始上传转录"按钮开始处理');
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadProgress').style.display = 'none';
+            document.getElementById('transcriptionResult').style.display = 'none';
+            clearStatus();
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) return;
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+
+            document.getElementById('uploadProgress').style.display = 'block';
+            updateProgress(0, '准备上传...');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                showStatus('info', '正在上传文件，请稍候...');
+
+                const response = await fetch('/api/transcription/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`上传失败: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('上传响应:', result);
+
+                if (result.success) {
+                    currentTaskId = result.data.taskId;
+                    showStatus('success', `文件上传成功！任务ID: ${currentTaskId}`);
+                    updateProgress(20, '文件已上传，开始转录...');
+                    
+                    // 开始轮询转录状态
+                    startPolling();
+                } else {
+                    throw new Error(result.error?.message || '上传失败');
+                }
+
+            } catch (error) {
+                console.error('上传错误:', error);
+                showStatus('error', `上传失败: ${error.message}`);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '开始上传转录';
+            }
+        }
+
+        function startPolling() {
+            if (!currentTaskId) return;
+
+            let attempts = 0;
+            const maxAttempts = 60; // 最多轮询1分钟
+
+            pollInterval = setInterval(async () => {
+                try {
+                    attempts++;
+                    const response = await fetch(`/api/transcription/${currentTaskId}`);
+                    
+                    if (!response.ok) {
+                        throw new Error('获取任务状态失败');
+                    }
+
+                    const result = await response.json();
+                    console.log('轮询响应:', result);
+
+                    if (result.success && result.data.task) {
+                        const task = result.data.task;
+                        
+                        if (task.status === 'processing') {
+                            updateProgress(Math.min(task.progress || 50, 90), '正在转录...');
+                            showStatus('info', `转录进行中... (${task.progress || 0}%)`);
+                        } else if (task.status === 'completed') {
+                            updateProgress(100, '转录完成！');
+                            showStatus('success', '转录完成！');
+                            
+                            if (task.result && task.result.text) {
+                                document.getElementById('transcriptionResult').style.display = 'block';
+                                document.getElementById('resultText').textContent = task.result.text;
+                            }
+                            
+                            clearInterval(pollInterval);
+                            pollInterval = null;
+                            resetUploadButton();
+                            return;
+                        } else if (task.status === 'error') {
+                            showStatus('error', `转录失败: ${task.error || '未知错误'}`);
+                            clearInterval(pollInterval);
+                            pollInterval = null;
+                            resetUploadButton();
+                            return;
+                        }
+                    }
+
+                    if (attempts >= maxAttempts) {
+                        showStatus('error', '转录超时，请手动刷新页面查看结果');
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        resetUploadButton();
+                    }
+
+                } catch (error) {
+                    console.error('轮询错误:', error);
+                    if (attempts >= maxAttempts) {
+                        showStatus('error', '无法获取转录状态，请稍后手动刷新页面');
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        resetUploadButton();
+                    }
+                }
+            }, 2000); // 每2秒轮询一次
+        }
+
+        function resetUploadButton() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '开始上传转录';
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = text;
+        }
+
+        function showStatus(type, message) {
+            const container = document.getElementById('statusMessages');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            container.appendChild(statusDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearStatus() {
+            document.getElementById('statusMessages').innerHTML = '';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html> 

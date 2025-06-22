@@ -1,8 +1,8 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs', 'esm'],
+  format: ['esm'],
   dts: true,
   splitting: false,
   sourcemap: true,
@@ -13,5 +13,5 @@ export default defineConfig({
   external: ['express', 'axios', 'multer', 'cors', 'form-data'],
   platform: 'node',
   keepNames: true,
-  bundle: true
-}) 
+  bundle: true,
+});

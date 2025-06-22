@@ -1,0 +1,32 @@
+/* 高维会议AI - 应用样式 */
+
+/* 自定义组件样式 */
+.upload-area {
+  transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 进度条动画 */
+.progress-bar {
+  transition: width 0.3s ease;
+}
+
+/* 文件列表动画 */
+.file-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

@@ -41,6 +41,7 @@
 </div>
 
 # Table of Contents
+
 - [Overview](#overview)
 - [Features](#features)
 - [System Architecture](#system-architecture)
@@ -79,6 +80,7 @@ An AI-powered meeting assistant that captures live meeting audio, transcribes it
 ### Why?
 
 While there are many meeting transcription tools available, this solution stands out by offering:
+
 - **Privacy First**: All processing happens locally on your device
 - **Cost Effective**: Uses open-source AI models instead of expensive APIs
 - **Flexible**: Works offline, supports multiple meeting platforms
@@ -101,12 +103,11 @@ While there are many meeting transcription tools available, this solution stands
 
 🚧 Export to Markdown/PDF/HTML
 
-🚧 Obsidian Integration 
+🚧 Obsidian Integration
 
 🚧 Speaker diarization
 
 ---
-
 
 # System Architecture
 
@@ -117,16 +118,19 @@ While there are many meeting transcription tools available, this solution stands
 ### Core Components
 
 1. **Audio Capture Service**
+
    - Real-time microphone/system audio capture
    - Audio preprocessing pipeline
    - Built with Rust (experimental) and Python
 
 2. **Transcription Engine**
+
    - Whisper.cpp for local transcription
    - Supports multiple model sizes (tiny->large)
    - GPU-accelerated processing
 
 3. **LLM Orchestrator**
+
    - Unified interface for multiple providers
    - Automatic fallback handling
    - Chunk processing with overlap
@@ -135,7 +139,6 @@ While there are many meeting transcription tools available, this solution stands
 4. **Data Services**
    - **ChromaDB**: Vector store for transcript embeddings
    - **SQLite**: Process tracking and metadata storage
-
 
 ### Deployment Architecture
 
@@ -153,7 +156,6 @@ While there are many meeting transcription tools available, this solution stands
 - Cmake 3.22+ (for building the frontend)
 - For Windows: Visual Studio Build Tools with C++ development workload
 
-
 # Setup Instructions
 
 ## Windows OS
@@ -161,12 +163,14 @@ While there are many meeting transcription tools available, this solution stands
 ### 1. Frontend Setup
 
 **Option 1: Using the Setup Executable (.exe) (Recommended)**
+
 1. Download the `meetily-frontend_0.0.4_x64-setup.exe` file
 2. Double-click the installer to run it
 3. Follow the on-screen instructions to complete the installation
 4. The application will be available on your desktop
 
 **Note:** Windows may display a security warning. To bypass this:
+
 - Click `More info` and choose `Run anyway`, or
 - Right-click on the installer (.exe), select Properties, and check the Unblock checkbox at the bottom
 
@@ -175,6 +179,7 @@ While there are many meeting transcription tools available, this solution stands
 </p>
 
 **Option 2: Using the MSI Installer (.msi)**
+
 1. Download the `meetily-frontend_0.0.4_x64_en-US.msi` file
 2. Double-click the MSI file to run it
 3. Follow the installation wizard to complete the setup
@@ -184,32 +189,35 @@ Provide necessary permissions for audio capture and microphone access.
 
 ### 2. Backend Setup
 
-
 <p align="center">
 <a href="https://www.youtube.com/watch?v=Tu_8wXgoaDE">
     <img src="https://img.youtube.com/vi/Tu_8wXgoaDE/0.jpg"  alt="Windows Security Warning" />
 </a>
 </p>
 
-
 **Option 1: Manual Setup**
+
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/Zackriya-Solutions/meeting-minutes
 cd meeting-minutes/backend
 ```
 
 2. Build dependencies:
+
 ```bash
 .\build_whisper.cmd
 ```
 
 3. Start the backend servers:
+
 ```bash
 .\start_with_output.ps1
 ```
 
 **Option 2: Docker Setup (including ARM64/Snapdragon)**
+
 ```bash
 # Clone the repository
 git clone https://github.com/Zackriya-Solutions/meeting-minutes.git
@@ -222,6 +230,7 @@ cd meeting-minutes
 ### Docker Configuration Options
 
 The Docker setup for both macOS and Windows allows you to configure:
+
 - Whisper model selection (tiny, base, small, medium, large-v3, etc.)
 - Language preference (auto-detection or specific language)
 - Logging level
@@ -231,7 +240,6 @@ The Docker setup for both macOS and Windows allows you to configure:
 ### 1. Frontend Setup
 
 Go to the [releases page](https://github.com/Zackriya-Solutions/meeting-minutes/releases) and download the latest version.
-
 
 **Option 1: Using Homebrew (Recommended)**
 
@@ -248,11 +256,13 @@ meetily-server --language en --model medium
 ```
 
 **Option 2: Manual Installation**
+
 - Download the `dmg_darwin_arch64.zip` file
 - Extract the file
 - Double-click the `.dmg` file inside the extracted folder
 - Drag the application to your Applications folder
 - Execute the following command in terminal to remove the quarantine attribute:
+
 ```
   xattr -c /Applications/meetily-frontend.app
 ```
@@ -262,6 +272,7 @@ Provide necessary permissions for audio capture and microphone access.
 ### 2. Backend Setup
 
 **Option 1: Using Homebrew (Recommended)**
+
 ```bash
 
 (Optional)
@@ -278,7 +289,7 @@ brew untap zackriya-solutions/meetily
 
 ```bash
 
-  
+
 
 # Install Meetily using Homebrew
 
@@ -286,7 +297,7 @@ brew tap zackriya-solutions/meetily
 
 brew install --cask meetily
 
-  
+
 
 # Start the backend server
 
@@ -295,6 +306,7 @@ meetily-server --language en --model medium
 ```
 
 **Option 2: Manual Setup**
+
 ```bash
 # Clone the repository
 git clone https://github.com/Zackriya-Solutions/meeting-minutes.git
@@ -316,7 +328,6 @@ chmod +x build_whisper.sh
 ./clean_start_backend.sh
 ```
 
-
 ### Development Setup
 
 ```bash
@@ -335,20 +346,23 @@ chmod +x clean_build.sh
 When setting up the backend (either via Homebrew, manual installation, or Docker), you can choose from various Whisper models based on your needs:
 
 1. **Standard models** (balance of accuracy and speed):
+
    - tiny, base, small, medium
 
 2. **English-optimized models** (faster for English content):
+
    - tiny.en, base.en, small.en, medium.en
 
 3. **Advanced models** (for special needs):
+
    - large-v3, large-v3-turbo
    - small.en-tdrz (with speaker diarization)
 
 4. **Quantized models** (reduced size, slightly lower quality):
    - tiny-q5_1, base-q5_1, small-q5_1, medium-q5_0
 
-
 ### Known issues
+
 - Smaller LLMs can hallucinate, making summarization quality poor; Please use model above 32B parameter size
 - Backend build process requires CMake, C++ compiler, etc. Making it harder to build
 - Backend build process requires Python 3.10 or newer
@@ -359,11 +373,10 @@ When setting up the backend (either via Homebrew, manual installation, or Docker
 The backend supports multiple LLM providers through a unified interface. Current implementations include:
 
 ### Supported Providers
+
 - **Anthropic** (Claude models)
 - **Groq** (Llama3.2 90 B)
 - **Ollama** (Local models that supports function calling)
-
-
 
 ## Troubleshooting
 
@@ -386,12 +399,14 @@ ls -la $(brew --prefix)/opt/meetily-backend/backend/whisper-server-package/model
 If the server fails to start:
 
 1. Check if ports 8178 and 5167 are available:
+
    ```bash
    lsof -i :8178
    lsof -i :5167
    ```
 
 2. Verify that FFmpeg is installed correctly:
+
    ```bash
    which ffmpeg
    ffmpeg -version
@@ -439,7 +454,6 @@ brew untap zackriya-solutions/meetily-backend
 brew uninstall ollama
 ```
 
-
 ## Development Guidelines
 
 - Follow the established project structure
@@ -470,14 +484,12 @@ Thanks for all the contributions. Our community is what makes this project possi
   <img src="https://contrib.rocks/image?repo=zackriya-solutions/meeting-minutes" />
 </a>
 
-
 We welcome contributions from the community! If you have any questions or suggestions, please open an issue or submit a pull request. Please follow the established project structure and guidelines. For more details, refer to the [CONTRIBUTING](CONTRIBUTING.md) file.
 
 ## Acknowledgments
 
 - We borrowes some code from [Whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 - We borrowes some code from [Screenpipe](https://github.com/mediar-ai/screenpipe)
-
 
 ## Star History
 

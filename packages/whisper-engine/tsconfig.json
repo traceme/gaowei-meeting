@@ -1,0 +1,12 @@
+{
+  "extends": "../../tooling/typescript-config/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@gaowei/shared-types": ["../shared-types/src"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
+} 

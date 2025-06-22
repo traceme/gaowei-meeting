@@ -1,4 +1,9 @@
-import express, { Request, Response, NextFunction, RequestHandler } from 'express';
+import express, {
+  Request,
+  Response,
+  NextFunction,
+  RequestHandler,
+} from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -39,9 +44,9 @@ export const loggingMiddleware = morgan(
 export const jsonMiddleware: RequestHandler = express.json({ limit: '10mb' });
 
 // URL编码解析中间件
-export const urlencodedMiddleware: RequestHandler = express.urlencoded({ 
-  extended: true, 
-  limit: '10mb' 
+export const urlencodedMiddleware: RequestHandler = express.urlencoded({
+  extended: true,
+  limit: '10mb',
 });
 
 // 文件上传中间件
@@ -92,21 +97,22 @@ export const sendError = (
   statusCode = 400,
   details?: any
 ): void => {
-  const apiError: ApiError = typeof error === 'string' 
-    ? {
-        code: 'GENERIC_ERROR',
-        message: error,
-        timestamp: new Date().toISOString(),
-        details,
-      }
-    : error;
+  const apiError: ApiError =
+    typeof error === 'string'
+      ? {
+          code: 'GENERIC_ERROR',
+          message: error,
+          timestamp: new Date().toISOString(),
+          details,
+        }
+      : error;
 
   const response: ApiResponse = {
     success: false,
     error: apiError,
     timestamp: new Date().toISOString(),
   };
-  
+
   res.status(statusCode).json(response);
 };
 
@@ -164,21 +170,29 @@ export const notFoundHandler = (req: Request, res: Response): void => {
 };
 
 // 请求日志中间件
-export const requestLogger: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {
+export const requestLogger: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     console.log(
       `${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`
     );
   });
-  
+
   next();
 };
 
 // 验证JSON中间件
-export const validateJson: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {
+export const validateJson: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
   if (req.is('application/json') && Object.keys(req.body).length === 0) {
     sendError(res, '请求体不能为空', 400);
     return;
@@ -187,21 +201,26 @@ export const validateJson: RequestHandler = (req: Request, res: Response, next: 
 };
 
 // 设置所有中间件的便捷函数
-export const setupMiddleware = (app: express.Application, config: typeof appConfig): void => {
+export const setupMiddleware = (
+  app: express.Application,
+  config: typeof appConfig
+): void => {
   // 基础中间件
   app.use(corsMiddleware);
   app.use(securityMiddleware);
   app.use(compressionMiddleware);
   app.use(loggingMiddleware);
   app.use(requestLogger);
-  
+
   // 解析中间件
   app.use(jsonMiddleware);
   app.use(urlencodedMiddleware);
-  
+
   // 文件上传中间件（仅对特定路由）
   app.use('/api/upload', uploadMiddleware.single('file'));
   app.use('/api/process', uploadMiddleware.single('file'));
+  app.use('/api/transcription/upload', uploadMiddleware.single('file'));
+  app.use('/api/summary/process', uploadMiddleware.single('file'));
 };
 
 // 设置错误处理中间件（应该在所有路由之后调用）
@@ -210,4 +229,4 @@ export const setupErrorHandling = (app: express.Application): void => {
   app.use(notFoundHandler);
   // 错误处理中间件
   app.use(errorHandler);
-}; 
+};

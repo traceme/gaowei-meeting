@@ -5,8 +5,11 @@ import { join } from 'path';
 config();
 
 export interface AppConfig {
-  port: number;
   env: string;
+  server: {
+    port: number;
+    host: string;
+  };
   cors: {
     origin: string[];
     credentials: boolean;
@@ -46,14 +49,18 @@ export interface AppConfig {
 }
 
 export const appConfig: AppConfig = {
-  port: parseInt(process.env.PORT || '3000', 10),
   env: process.env.NODE_ENV || 'development',
+  server: {
+    port: parseInt(process.env.PORT || '3000', 10),
+    host: process.env.SERVER_HOST || 'localhost',
+  },
   cors: {
     origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173'],
     credentials: true,
   },
   database: {
-    path: process.env.DB_PATH || join(process.cwd(), 'data', 'meeting_minutes.db'),
+    path:
+      process.env.DB_PATH || join(process.cwd(), 'data', 'meeting_minutes.db'),
   },
   upload: {
     maxSize: parseInt(process.env.MAX_UPLOAD_SIZE || '100', 10) * 1024 * 1024, // MB to bytes
@@ -69,6 +76,9 @@ export const appConfig: AppConfig = {
       'audio/ogg',
       'audio/flac',
       'audio/webm',
+      'audio/aiff',
+      'audio/x-aiff',
+      'application/octet-stream', // 兼容一些音频文件被识别为此类型
     ],
     uploadDir: process.env.UPLOAD_DIR || join(process.cwd(), 'data', 'uploads'),
   },
@@ -102,8 +112,9 @@ export const appConfig: AppConfig = {
     serverUrl: process.env.WHISPER_SERVER_URL || 'http://localhost:8178',
     serverPort: parseInt(process.env.WHISPER_SERVER_PORT || '8178', 10),
     model: process.env.WHISPER_MODEL || 'small',
-    modelSize: process.env.WHISPER_MODEL_SIZE || process.env.WHISPER_MODEL || 'small',
+    modelSize:
+      process.env.WHISPER_MODEL_SIZE || process.env.WHISPER_MODEL || 'small',
   },
 };
 
-export default appConfig; 
+export default appConfig;

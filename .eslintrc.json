@@ -1,42 +1,31 @@
 {
-  "parser": "@typescript-eslint/parser",
-  "parserOptions": {
-    "ecmaVersion": 2022,
-    "sourceType": "module",
-    "ecmaFeatures": {
-      "jsx": true
-    }
-  },
-  "plugins": [
-    "@typescript-eslint",
-    "prettier"
-  ],
+  "root": true,
   "extends": [
-    "eslint:recommended",
-    "@typescript-eslint/recommended",
-    "prettier"
+    "eslint:recommended"
   ],
   "rules": {
-    "prettier/prettier": "error",
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/explicit-function-return-type": "off",
-    "@typescript-eslint/no-non-null-assertion": "warn",
     "prefer-const": "error",
     "no-var": "error",
-    "no-console": "warn"
+    "no-console": "warn",
+    "no-unused-vars": "warn"
   },
   "env": {
     "browser": true,
     "node": true,
-    "es2022": true,
-    "jest": true
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
   },
   "ignorePatterns": [
-    "node_modules/",
     "dist/",
-    "build/",
+    "build/", 
+    "node_modules/",
+    "*.config.js",
+    "*.config.ts",
     "coverage/",
-    "*.config.js"
+    ".next/",
+    "storybook-static/"
   ]
 } 

@@ -30,10 +30,10 @@ export function useApiStatus(interval = 30000) {
   const checkStatus = useCallback(async () => {
     try {
       setStatus(prev => ({ ...prev, isLoading: true, error: null }));
-      
+
       const [healthResponse, servicesResponse] = await Promise.all([
         getHealthStatus(),
-        getServicesStatus()
+        getServicesStatus(),
       ]);
 
       setStatus({
@@ -45,10 +45,9 @@ export function useApiStatus(interval = 30000) {
         lastCheck: new Date(),
       });
     } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : '连接失败';
-        
+      const errorMessage =
+        error instanceof ApiError ? error.message : '连接失败';
+
       setStatus({
         isOnline: false,
         isLoading: false,
@@ -72,4 +71,4 @@ export function useApiStatus(interval = 30000) {
     ...status,
     refetch: checkStatus,
   };
-} 
+}

@@ -15,4 +15,4 @@
   },
   "include": ["src", "vite.config.ts"],
   "exclude": ["dist", "build", "node_modules"]
-} 
+}

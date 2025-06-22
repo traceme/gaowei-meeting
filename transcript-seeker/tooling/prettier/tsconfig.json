@@ -1,5 +1,0 @@
-{
-  "extends": "@meeting-baas/tsconfig/base.json",
-  "include": ["."],
-  "exclude": ["node_modules"]
-}

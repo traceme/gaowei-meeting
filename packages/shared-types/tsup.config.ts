@@ -8,4 +8,4 @@ export default defineConfig({
   clean: true,
   minify: false,
   external: [],
-}); 
+});

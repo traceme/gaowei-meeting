@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import type { TranscriptionTask, SummaryResponse } from '@gaowei/shared-types';
-import { 
-  uploadAudioFile, 
-  processCompleteWorkflow, 
-  getTranscriptionStatus, 
+import {
+  uploadAudioFile,
+  processCompleteWorkflow,
+  getTranscriptionStatus,
   getProcessStatus,
   generateSummary,
-  ApiError 
+  ApiError,
 } from '../services/api';
 
 interface ProcessingState {
@@ -59,190 +59,199 @@ export function useFileProcessing() {
   }, [clearPolling]);
 
   // 轮询任务状态
-  const pollTaskStatus = useCallback(async (taskId: string, isTranscription = true) => {
-    try {
-      const response = isTranscription 
-        ? await getTranscriptionStatus(taskId)
-        : await getProcessStatus(taskId);
-      
-      const task = response.task;
-      
-      setState(prev => ({
-        ...prev,
-        currentTask: isTranscription ? task as TranscriptionTask : prev.currentTask,
-        processingProgress: task.progress || 0,
-      }));
+  const pollTaskStatus = useCallback(
+    async (taskId: string, isTranscription = true) => {
+      try {
+        const response = isTranscription
+          ? await getTranscriptionStatus(taskId)
+          : await getProcessStatus(taskId);
 
-      // 检查是否完成
-      if (task.status === 'completed') {
-        clearPolling();
+        const task = response.task;
+
+        setState(prev => ({
+          ...prev,
+          currentTask: isTranscription
+            ? (task as TranscriptionTask)
+            : prev.currentTask,
+          processingProgress: task.progress || 0,
+        }));
+
+        // 检查是否完成
+        if (task.status === 'completed') {
+          clearPolling();
+          setState(prev => ({
+            ...prev,
+            isProcessing: false,
+            result: {
+              ...prev.result,
+              meetingId: prev.result?.meetingId,
+              transcription: isTranscription
+                ? (task as TranscriptionTask).result
+                : prev.result?.transcription,
+              summary: !isTranscription
+                ? (task as any).summaryResult
+                : prev.result?.summary,
+            },
+          }));
+          return true;
+        } else if (task.status === 'error') {
+          clearPolling();
+          setState(prev => ({
+            ...prev,
+            isProcessing: false,
+            error: (task as any).error || '处理失败',
+          }));
+          return false;
+        }
+
+        return false;
+      } catch (error) {
+        const errorMessage =
+          error instanceof ApiError ? error.message : '获取处理状态失败';
+
+        setState(prev => ({
+          ...prev,
+          error: errorMessage,
+        }));
+
+        return false;
+      }
+    },
+    [clearPolling]
+  );
+
+  // 开始轮询
+  const startPolling = useCallback(
+    (taskId: string, isTranscription = true) => {
+      clearPolling();
+
+      pollIntervalRef.current = window.setInterval(async () => {
+        const completed = await pollTaskStatus(taskId, isTranscription);
+        if (completed) {
+          clearPolling();
+        }
+      }, 2000);
+    },
+    [clearPolling, pollTaskStatus]
+  );
+
+  // 仅上传文件
+  const uploadFile = useCallback(
+    async (file: File, meetingId?: string, language?: string) => {
+      try {
+        reset();
+        setState(prev => ({ ...prev, isUploading: true }));
+
+        const response = await uploadAudioFile(file, meetingId, language);
+
+        setState(prev => ({
+          ...prev,
+          isUploading: false,
+          isProcessing: true,
+          result: { meetingId: response.meetingId },
+        }));
+
+        // 开始轮询转录状态
+        startPolling(response.taskId, true);
+
+        return response;
+      } catch (error) {
+        const errorMessage =
+          error instanceof ApiError ? error.message : '文件上传失败';
+
+        setState(prev => ({
+          ...prev,
+          isUploading: false,
+          error: errorMessage,
+        }));
+
+        throw error;
+      }
+    },
+    [reset, startPolling]
+  );
+
+  // 完整处理流程（上传+转录+摘要）
+  const processComplete = useCallback(
+    async (
+      file: File,
+      title?: string,
+      description?: string,
+      language?: string,
+      model?: string
+    ) => {
+      try {
+        reset();
+        setState(prev => ({ ...prev, isUploading: true }));
+
+        const response = await processCompleteWorkflow(
+          file,
+          title,
+          description,
+          language,
+          model
+        );
+
+        setState(prev => ({
+          ...prev,
+          isUploading: false,
+          isProcessing: true,
+          result: { meetingId: response.meetingId },
+        }));
+
+        // 开始轮询处理状态
+        startPolling(response.processTaskId, false);
+
+        return response;
+      } catch (error) {
+        const errorMessage =
+          error instanceof ApiError ? error.message : '处理失败';
+
+        setState(prev => ({
+          ...prev,
+          isUploading: false,
+          error: errorMessage,
+        }));
+
+        throw error;
+      }
+    },
+    [reset, startPolling]
+  );
+
+  // 生成摘要（独立操作）
+  const generateAISummary = useCallback(
+    async (meetingId: string, text: string, model?: string) => {
+      try {
+        setState(prev => ({ ...prev, isProcessing: true, error: null }));
+
+        const response = await generateSummary(meetingId, text, model);
+
         setState(prev => ({
           ...prev,
           isProcessing: false,
           result: {
             ...prev.result,
-            meetingId: prev.result?.meetingId,
-            transcription: isTranscription ? (task as TranscriptionTask).result : prev.result?.transcription,
-            summary: !isTranscription ? (task as any).summaryResult : prev.result?.summary,
-          }
+            summary: response.summary,
+          },
         }));
-        return true;
-      } else if (task.status === 'error') {
-        clearPolling();
+
+        return response.summary;
+      } catch (error) {
+        const errorMessage =
+          error instanceof ApiError ? error.message : '生成摘要失败';
+
         setState(prev => ({
           ...prev,
           isProcessing: false,
-          error: (task as any).error || '处理失败',
+          error: errorMessage,
         }));
-        return false;
+
+        throw error;
       }
-      
-      return false;
-    } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : '获取处理状态失败';
-        
-      setState(prev => ({
-        ...prev,
-        error: errorMessage,
-      }));
-      
-      return false;
-    }
-  }, [clearPolling]);
-
-  // 开始轮询
-  const startPolling = useCallback((taskId: string, isTranscription = true) => {
-    clearPolling();
-    
-    pollIntervalRef.current = window.setInterval(async () => {
-      const completed = await pollTaskStatus(taskId, isTranscription);
-      if (completed) {
-        clearPolling();
-      }
-    }, 2000);
-  }, [clearPolling, pollTaskStatus]);
-
-  // 仅上传文件
-  const uploadFile = useCallback(async (
-    file: File,
-    meetingId?: string,
-    language?: string
-  ) => {
-    try {
-      reset();
-      setState(prev => ({ ...prev, isUploading: true }));
-
-      const response = await uploadAudioFile(file, meetingId, language);
-      
-      setState(prev => ({
-        ...prev,
-        isUploading: false,
-        isProcessing: true,
-        result: { meetingId: response.meetingId },
-      }));
-
-      // 开始轮询转录状态
-      startPolling(response.taskId, true);
-      
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : '文件上传失败';
-        
-      setState(prev => ({
-        ...prev,
-        isUploading: false,
-        error: errorMessage,
-      }));
-      
-      throw error;
-    }
-  }, [reset, startPolling]);
-
-  // 完整处理流程（上传+转录+摘要）
-  const processComplete = useCallback(async (
-    file: File,
-    title?: string,
-    description?: string,
-    language?: string,
-    model?: string
-  ) => {
-    try {
-      reset();
-      setState(prev => ({ ...prev, isUploading: true }));
-
-      const response = await processCompleteWorkflow(
-        file, 
-        title, 
-        description, 
-        language, 
-        model
-      );
-      
-      setState(prev => ({
-        ...prev,
-        isUploading: false,
-        isProcessing: true,
-        result: { meetingId: response.meetingId },
-      }));
-
-      // 开始轮询处理状态
-      startPolling(response.processTaskId, false);
-      
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : '处理失败';
-        
-      setState(prev => ({
-        ...prev,
-        isUploading: false,
-        error: errorMessage,
-      }));
-      
-      throw error;
-    }
-  }, [reset, startPolling]);
-
-  // 生成摘要（独立操作）
-  const generateAISummary = useCallback(async (
-    meetingId: string,
-    text: string,
-    model?: string
-  ) => {
-    try {
-      setState(prev => ({ ...prev, isProcessing: true, error: null }));
-
-      const response = await generateSummary(meetingId, text, model);
-      
-      setState(prev => ({
-        ...prev,
-        isProcessing: false,
-        result: {
-          ...prev.result,
-          summary: response.summary,
-        }
-      }));
-      
-      return response.summary;
-    } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : '生成摘要失败';
-        
-      setState(prev => ({
-        ...prev,
-        isProcessing: false,
-        error: errorMessage,
-      }));
-      
-      throw error;
-    }
-  }, []);
+    },
+    []
+  );
 
   // 清除错误
   const clearError = useCallback(() => {
@@ -257,4 +266,4 @@ export function useFileProcessing() {
     reset,
     clearError,
   };
-} 
+}

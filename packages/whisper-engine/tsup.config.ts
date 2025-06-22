@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -8,10 +8,10 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  tsconfig: '../../tsconfig.json',
+  tsconfig: './tsconfig.json',
   outDir: 'dist',
   external: ['axios', 'form-data', 'node-fetch'],
   platform: 'node',
   keepNames: true,
-  bundle: true
-}) 
+  bundle: true,
+});

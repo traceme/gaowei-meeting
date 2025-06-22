@@ -1,8 +1,7 @@
-import type { 
-  Meeting, 
-  TranscriptionTask, 
-  TranscriptionResult,
-  SummaryResponse
+import type {
+  Meeting,
+  TranscriptionTask,
+  SummaryResponse,
 } from '@gaowei/shared-types';
 
 const API_BASE = '/api';
@@ -24,7 +23,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  
+
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
@@ -34,10 +33,10 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ 
-      message: response.statusText 
+    const errorData = await response.json().catch(() => ({
+      message: response.statusText,
     }));
-    
+
     throw new ApiError(
       errorData.error?.message || errorData.message || '请求失败',
       response.status,
@@ -81,7 +80,9 @@ export async function getApiInfo() {
 
 // 会议管理
 export async function getMeetings(limit = 50, offset = 0) {
-  return request<{ meetings: Meeting[] }>(`/meetings?limit=${limit}&offset=${offset}`);
+  return request<{ meetings: Meeting[] }>(
+    `/meetings?limit=${limit}&offset=${offset}`
+  );
 }
 
 export async function createMeeting(title: string, description?: string) {
@@ -113,11 +114,11 @@ export async function uploadAudioFile(
 }> {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   if (meetingId) {
     formData.append('meetingId', meetingId);
   }
-  
+
   if (language) {
     formData.append('language', language);
   }
@@ -128,10 +129,10 @@ export async function uploadAudioFile(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ 
-      message: response.statusText 
+    const errorData = await response.json().catch(() => ({
+      message: response.statusText,
     }));
-    
+
     throw new ApiError(
       errorData.error || errorData.message || '上传失败',
       response.status
@@ -179,19 +180,19 @@ export async function processCompleteWorkflow(
 }> {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   if (title) {
     formData.append('title', title);
   }
-  
+
   if (description) {
     formData.append('description', description);
   }
-  
+
   if (language) {
     formData.append('language', language);
   }
-  
+
   if (model) {
     formData.append('model', model);
   }
@@ -202,10 +203,10 @@ export async function processCompleteWorkflow(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ 
-      message: response.statusText 
+    const errorData = await response.json().catch(() => ({
+      message: response.statusText,
     }));
-    
+
     throw new ApiError(
       errorData.error || errorData.message || '处理失败',
       response.status
@@ -217,7 +218,7 @@ export async function processCompleteWorkflow(
 
 // 处理任务状态查询
 export async function getProcessStatus(taskId: string) {
-  return request<{ 
+  return request<{
     task: {
       id: string;
       status: string;
@@ -226,7 +227,7 @@ export async function getProcessStatus(taskId: string) {
       summaryResult?: SummaryResponse;
       error?: string;
       created_at: Date;
-    }
+    };
   }>(`/process/${taskId}`);
 }
 
@@ -245,4 +246,4 @@ export async function getServicesStatus() {
   }>('/services/status');
 }
 
-export { ApiError }; 
+export { ApiError };

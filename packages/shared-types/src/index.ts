@@ -204,7 +204,7 @@ export interface ApiKeyConfig {
 }
 
 // 音频播放器相关类型
-export interface VidstackAudioPlayerProps {
+export interface AudioPlayerProps {
   audioUrl: string;
   segments: AudioSegment[];
   onTimeUpdate?: (currentTime: number) => void;
@@ -330,7 +330,7 @@ export const SUPPORTED_AUDIO_FORMATS = [
   'audio/m4a',
   'audio/aac',
   'audio/ogg',
-  'audio/flac'
+  'audio/flac',
 ] as const;
 
 export const AI_PROVIDERS = [
@@ -343,7 +343,7 @@ export const AI_PROVIDERS = [
   'azure',
   'openrouter',
   'xai',
-  'groq'
+  'groq',
 ] as const;
 
 export const TRANSCRIPTION_ENGINES = [
@@ -354,12 +354,17 @@ export const TRANSCRIPTION_ENGINES = [
   'azure-speech',
   'google-speech',
   'groq-whisper',
-  'local'
+  'local',
 ] as const;
 
-export type SupportedAudioFormat = typeof SUPPORTED_AUDIO_FORMATS[number];
-export type AIProvider = typeof AI_PROVIDERS[number];
-export type TranscriptionEngineType = typeof TRANSCRIPTION_ENGINES[number];
+export type SupportedAudioFormat = (typeof SUPPORTED_AUDIO_FORMATS)[number];
+export type AIProvider = (typeof AI_PROVIDERS)[number];
+export type TranscriptionEngineType = (typeof TRANSCRIPTION_ENGINES)[number];
 
-export type TaskStatus = 'pending' | 'processing' | 'completed' | 'error' | 'cancelled';
-export type FileFormat = 'mp3' | 'wav' | 'm4a' | 'flac' | 'ogg' | 'webm'; 
+export type TaskStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'error'
+  | 'cancelled';
+export type FileFormat = 'mp3' | 'wav' | 'm4a' | 'flac' | 'ogg' | 'webm';

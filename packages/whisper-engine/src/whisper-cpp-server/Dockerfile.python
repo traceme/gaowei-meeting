@@ -1,0 +1,85 @@
+FROM python:3.11-slim
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 包
+RUN pip install --no-cache-dir \
+    faster-whisper \
+    flask \
+    flask-cors
+
+WORKDIR /app
+
+# 创建简单的 HTTP 服务器
+RUN cat > app.py << 'EOF'
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from faster_whisper import WhisperModel
+import tempfile
+import os
+
+app = Flask(__name__)
+CORS(app)
+
+# 初始化模型
+model = WhisperModel("base.en", device="cpu", compute_type="int8")
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"})
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({"message": "Whisper.cpp compatible server"})
+
+@app.route('/inference', methods=['POST'])
+def transcribe():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        
+        # 保存临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            file.save(tmp_file.name)
+            
+            # 转录
+            segments, info = model.transcribe(tmp_file.name)
+            
+            # 格式化结果
+            result = {
+                "text": "",
+                "segments": []
+            }
+            
+            for segment in segments:
+                result["segments"].append({
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text
+                })
+                result["text"] += segment.text
+            
+            # 清理临时文件
+            os.unlink(tmp_file.name)
+            
+            return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8178)
+EOF
+
+EXPOSE 8178
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8178/health || exit 1
+
+CMD ["python", "app.py"]

@@ -86,3 +86,4 @@ graph TD
 - Integrates external models
 - Provides additional processing tools
 - Uses smaller, efficient LLMs
+```
