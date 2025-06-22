@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ConfirmModal, Toast } from '../components/Modal';
 
 interface TranscriptionTask {
   id: string;
@@ -41,6 +42,29 @@ const HistoryPage: React.FC = () => {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'date' | 'filename' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'warning' | 'danger' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    message: string;
+    type?: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    message: '',
+  });
 
   // 获取历史记录
   useEffect(() => {
@@ -183,46 +207,64 @@ const HistoryPage: React.FC = () => {
   };
 
   // 批量删除
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedTasks.size === 0) return;
     
-    if (!confirm(`确定要删除选中的 ${selectedTasks.size} 个任务吗？此操作不可撤销。`)) return;
-
-    try {
-      console.log('批量删除任务:', Array.from(selectedTasks));
-      
-      // 并行删除所有选中的任务
-      const deletePromises = Array.from(selectedTasks).map(async (taskId) => {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-          method: 'DELETE',
-        });
-        const result = await response.json();
-        return { taskId, success: result.success, error: result.error };
-      });
-      
-      const results = await Promise.all(deletePromises);
-      
-      // 统计成功和失败的数量
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
-      
-      // 从本地状态中移除成功删除的任务
-      if (successful.length > 0) {
-        const successfulIds = new Set(successful.map(r => r.taskId));
-        setTasks(prev => prev.filter(task => !successfulIds.has(task.id)));
-        setSelectedTasks(new Set());
-      }
-      
-      // 显示结果信息
-      if (failed.length === 0) {
-        alert(`成功删除 ${successful.length} 个任务`);
-      } else {
-        alert(`成功删除 ${successful.length} 个任务，失败 ${failed.length} 个任务\n\n失败原因：\n${failed.map(f => `任务 ${f.taskId}: ${f.error}`).join('\n')}`);
-      }
-    } catch (error) {
-      console.error('批量删除任务失败:', error);
-      alert('批量删除失败，请检查网络连接后重试');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: '批量删除确认',
+      message: `确定要删除选中的 ${selectedTasks.size} 个任务吗？此操作不可撤销。`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          console.log('批量删除任务:', Array.from(selectedTasks));
+          
+          // 并行删除所有选中的任务
+          const deletePromises = Array.from(selectedTasks).map(async (taskId) => {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+              method: 'DELETE',
+            });
+            const result = await response.json();
+            return { taskId, success: result.success, error: result.error };
+          });
+          
+          const results = await Promise.all(deletePromises);
+          
+          // 统计成功和失败的数量
+          const successful = results.filter(r => r.success);
+          const failed = results.filter(r => !r.success);
+          
+          // 从本地状态中移除成功删除的任务
+          if (successful.length > 0) {
+            const successfulIds = new Set(successful.map(r => r.taskId));
+            setTasks(prev => prev.filter(task => !successfulIds.has(task.id)));
+            setSelectedTasks(new Set());
+          }
+          
+          // 显示结果信息
+          if (failed.length === 0) {
+            setToast({
+              isOpen: true,
+              message: `成功删除 ${successful.length} 个任务`,
+              type: 'success',
+            });
+          } else {
+            setToast({
+              isOpen: true,
+              message: `成功删除 ${successful.length} 个任务，失败 ${failed.length} 个任务`,
+              type: 'warning',
+            });
+          }
+        } catch (error) {
+          console.error('批量删除任务失败:', error);
+          setToast({
+            isOpen: true,
+            message: '批量删除失败，请检查网络连接后重试',
+            type: 'error',
+          });
+        }
+      },
+    });
   };
 
   // 查看任务详情
@@ -325,37 +367,55 @@ ${task.result.segments.map(seg =>
   };
 
   // 删除单个任务
-  const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('确定要删除这个任务吗？此操作不可撤销。')) return;
-    
-    try {
-      console.log('删除任务:', taskId);
-      
-      // 调用API删除任务
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // 删除成功，从本地状态中移除
-        setTasks(prev => prev.filter(task => task.id !== taskId));
-        setSelectedTasks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
-        
-        alert('任务已成功删除');
-      } else {
-        console.error('删除任务失败:', result.error);
-        alert(`删除失败: ${result.error || '未知错误'}`);
-      }
-    } catch (error) {
-      console.error('删除任务失败:', error);
-      alert('删除失败，请检查网络连接后重试');
-    }
+  const handleDeleteTask = (taskId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '删除确认',
+      message: '确定要删除这个任务吗？此操作不可撤销。',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          console.log('删除任务:', taskId);
+          
+          // 调用API删除任务
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE',
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            // 删除成功，从本地状态中移除
+            setTasks(prev => prev.filter(task => task.id !== taskId));
+            setSelectedTasks(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(taskId);
+              return newSet;
+            });
+            
+            setToast({
+              isOpen: true,
+              message: '任务已成功删除',
+              type: 'success',
+            });
+          } else {
+            console.error('删除任务失败:', result.error);
+            setToast({
+              isOpen: true,
+              message: `删除失败: ${result.error || '未知错误'}`,
+              type: 'error',
+            });
+          }
+        } catch (error) {
+          console.error('删除任务失败:', error);
+          setToast({
+            isOpen: true,
+            message: '删除失败，请检查网络连接后重试',
+            type: 'error',
+          });
+        }
+      },
+    });
   };
 
   // 格式化持续时间
@@ -658,6 +718,27 @@ ${task.result.segments.map(seg =>
           )}
         </div>
       </div>
+      
+      {/* 确认对话框 */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={() => {
+          confirmModal.onConfirm();
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
+      
+      {/* 成功/错误提示 */}
+      <Toast
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        message={toast.message}
+        type={toast.type}
+      />
     </div>
   );
 };
