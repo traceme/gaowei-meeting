@@ -262,6 +262,15 @@ async function processTranscriptionInBackground(
         formData.append('language', languageCode);
       }
 
+      // 为所有支持的引擎启用词级时间戳以支持音频播放功能
+      if (currentEngine === 'whisper-cpp') {
+        formData.append('word_timestamps', 'true');
+        formData.append('response_format', 'verbose_json');
+      } else if (currentEngine === 'faster-whisper') {
+        formData.append('word_timestamps', 'true');
+        formData.append('response_format', 'verbose_json');
+      }
+
       const response = await axios.post(`${whisperServerUrl}/inference`, formData, {
         headers: formData.getHeaders(),
       });
@@ -297,6 +306,27 @@ async function processTranscriptionInBackground(
               
               if (status.status === 'completed' && status.result) {
                 // 转录完成，处理结果
+                console.log('🔍 faster-whisper异步响应调试信息:');
+                console.log(`- segments数量: ${status.result.segments?.length || 0}`);
+                console.log(`- 第一个segment的keys: ${status.result.segments?.[0] ? Object.keys(status.result.segments[0]).join(', ') : 'N/A'}`);
+                console.log(`- 第一个segment有words: ${status.result.segments?.[0]?.words ? '是' : '否'}`);
+                console.log(`- words数量: ${status.result.segments?.[0]?.words?.length || 0}`);
+                
+                // 调试：保存完整的faster-whisper响应到文件
+                try {
+                  const { writeFileSync } = await import('fs');
+                  const debugData = {
+                    timestamp: new Date().toISOString(),
+                    taskId,
+                    engine: currentEngine,
+                    whisperResult: status.result,
+                  };
+                  writeFileSync(`/tmp/whisper-debug-${taskId}.json`, JSON.stringify(debugData, null, 2));
+                  console.log(`📋 调试数据已保存到 /tmp/whisper-debug-${taskId}.json`);
+                } catch (debugError) {
+                  console.warn('调试文件写入失败:', debugError);
+                }
+                
                 const result = {
                   text: status.result.text || '',
                   language: status.result.language || 'unknown',
@@ -332,12 +362,36 @@ async function processTranscriptionInBackground(
         throw new Error('转录任务超时');
       } else {
         // 直接返回结果的情况（同步处理）
+        console.log('🔍 whisper.cpp同步响应调试信息:');
+        console.log(`- segments数量: ${whisperResult.segments?.length || 0}`);
+        console.log(`- 第一个segment的keys: ${whisperResult.segments?.[0] ? Object.keys(whisperResult.segments[0]).join(', ') : 'N/A'}`);
+        console.log(`- 第一个segment有words: ${whisperResult.segments?.[0]?.words ? '是' : '否'}`);
+        console.log(`- words数量: ${whisperResult.segments?.[0]?.words?.length || 0}`);
+        
+        // 调试：保存完整的whisper.cpp响应到文件
+        try {
+          const { writeFileSync } = await import('fs');
+          const debugData = {
+            timestamp: new Date().toISOString(),
+            taskId,
+            engine: currentEngine,
+            whisperResult: JSON.parse(JSON.stringify(whisperResult)), // 深拷贝
+          };
+          writeFileSync(`/tmp/whisper-debug-${taskId}.json`, JSON.stringify(debugData, null, 2));
+          console.log(`📋 调试数据已保存到 /tmp/whisper-debug-${taskId}.json`);
+        } catch (debugError) {
+          console.warn('调试文件写入失败:', debugError);
+        }
+        
+        // 保存完整的segments数据，包括词级时间戳
+        const segments = whisperResult.segments || [];
+        
         const result = {
           text: whisperResult.text || '',
           language: whisperResult.detected_language || whisperResult.language || 'unknown',
           duration: whisperResult.duration || 0,
           confidence: 0.95,
-          segments: whisperResult.segments || [],
+          segments: segments,
         };
         
         await meetingManager.updateTranscriptionTask(taskId, {
