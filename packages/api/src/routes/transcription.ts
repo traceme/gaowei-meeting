@@ -10,10 +10,25 @@ import {
 } from '../services/transcription.js';
 import { appConfig } from '../config/index.js';
 import { sendSuccess, sendError } from '../middleware/index.js';
+import type { WhisperEngineType } from '@gaowei/shared-types';
 
 const router: IRouter = Router();
 let meetingManager: MeetingManager;
 let transcriptionRouter: TranscriptionRouter;
+
+// 获取当前选择的引擎
+async function getCurrentEngine(): Promise<WhisperEngineType> {
+  try {
+    const response = await fetch('http://localhost:3000/api/engine/current');
+    if (response.ok) {
+      const data = await response.json();
+      return data.data?.engine || 'faster-whisper';
+    }
+  } catch (error) {
+    console.warn('获取当前引擎失败，使用默认引擎:', error);
+  }
+  return 'faster-whisper';
+}
 
 // 初始化服务
 const initializeServices = () => {
@@ -132,7 +147,7 @@ router.get('/', async (req: Request, res: Response) => {
       offset: offset ? parseInt(offset as string) : 0,
     };
 
-    const tasks = meetingManager.getAllTranscriptionTasks(filters);
+    const tasks = await meetingManager.getAllTranscriptionTasks(filters);
     
     sendSuccess(res, {
       tasks,
@@ -168,7 +183,46 @@ async function processTranscriptionInBackground(
     // 读取音频文件
     const audioBuffer = await readFile(audioFilePath);
     
-    console.log(`🎙️ 开始转录任务 ${taskId}...`);
+    // 获取当前选择的引擎
+    const currentEngine = await getCurrentEngine();
+    console.log(`🎙️ 开始转录任务 ${taskId}，使用引擎: ${currentEngine}...`);
+    
+        // 如果选择了OpenAI引擎，直接使用统一的引擎路由器
+    if (currentEngine === 'openai') {
+      console.log('🌐 使用OpenAI引擎进行转录...');
+      
+      const result = await transcriptionRouter.transcribe(
+        audioBuffer,
+        filename,
+        {
+          ...options,
+          engineType: 'openai',
+        }
+      );
+
+      await meetingManager.updateTranscriptionTask(taskId, {
+        status: 'completed',
+        progress: 100,
+        result: result,
+      });
+
+      console.log(`✅ 转录任务 ${taskId} 完成（OpenAI）`);
+      return;
+    }
+    
+    // 根据选择的引擎确定服务器URL
+    let whisperServerUrl: string;
+    switch (currentEngine) {
+      case 'whisper-cpp':
+        whisperServerUrl = 'http://localhost:8081';
+        break;
+      case 'faster-whisper':
+      default:
+        whisperServerUrl = appConfig.whisper.serverUrl || 'http://localhost:8178';
+        break;
+    }
+    
+    console.log(`🔧 使用服务器: ${whisperServerUrl}`);
     
     // 计算音频时长估算超时时间
     const getTranscriptionTimeout = (audioBuffer: Buffer): number => {
@@ -188,9 +242,6 @@ async function processTranscriptionInBackground(
     
     console.log(`📊 预计转录时间: ${Math.round(timeoutSeconds/60)} 分钟，文件大小: ${Math.round(audioBuffer.length/(1024*1024))}MB`);
     
-    // 检查是否使用本地Whisper服务
-    const whisperServerUrl = appConfig.whisper.serverUrl || 'http://localhost:8178';
-    
     try {
       // 发送转录请求到Whisper服务
       const formData = new FormData();
@@ -200,7 +251,15 @@ async function processTranscriptionInBackground(
       });
       
       if (options.language) {
-        formData.append('language', options.language);
+        // whisper.cpp使用不同的语言代码格式
+        let languageCode = options.language;
+        if (currentEngine === 'whisper-cpp') {
+          // 将zh-cn转换为zh，因为whisper.cpp使用ISO 639-1格式
+          if (languageCode === 'zh-cn' || languageCode === 'zh-CN') {
+            languageCode = 'zh';
+          }
+        }
+        formData.append('language', languageCode);
       }
 
       const response = await axios.post(`${whisperServerUrl}/inference`, formData, {
@@ -275,7 +334,7 @@ async function processTranscriptionInBackground(
         // 直接返回结果的情况（同步处理）
         const result = {
           text: whisperResult.text || '',
-          language: whisperResult.language || 'unknown',
+          language: whisperResult.detected_language || whisperResult.language || 'unknown',
           duration: whisperResult.duration || 0,
           confidence: 0.95,
           segments: whisperResult.segments || [],
@@ -290,13 +349,27 @@ async function processTranscriptionInBackground(
         console.log(`✅ 转录任务 ${taskId} 完成（同步）`);
       }
     } catch (whisperError) {
-      console.warn('⚠️ Whisper服务不可用，使用备用转录引擎...');
+      console.warn(`⚠️ ${currentEngine} 服务不可用，使用备用转录引擎...`);
+      
+             // 根据当前引擎类型选择合适的引擎类型参数
+      let engineType: 'local' | 'openai' = 'local';
+      // 本地引擎失败，如果有OpenAI API密钥，尝试使用OpenAI
+      if (appConfig.ai.providers.openai?.apiKey) {
+        console.log('📍 本地引擎失败，尝试使用OpenAI引擎...');
+        engineType = 'openai';
+      } else {
+        console.log('📍 本地引擎失败，尝试其他本地引擎...');
+        engineType = 'local';
+      }
       
       // 使用备用转录引擎
       const result = await transcriptionRouter.transcribe(
         audioBuffer,
         filename,
-        options
+        {
+          ...options,
+          engineType,
+        }
       );
 
       await meetingManager.updateTranscriptionTask(taskId, {
@@ -305,7 +378,7 @@ async function processTranscriptionInBackground(
         result: result,
       });
 
-      console.log(`✅ 转录任务 ${taskId} 完成（备用引擎）`);
+      console.log(`✅ 转录任务 ${taskId} 完成（备用引擎: ${engineType}）`);
     }
 
   } catch (error) {
