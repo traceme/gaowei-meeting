@@ -268,6 +268,24 @@ ${task.result.segments.map((seg, index) => {
   // 构建音频URL - 使用相对URL让Vite代理处理
   const audioUrl = `/uploads/${task.filename}`;
 
+  // 简单的关键词提取函数
+  const extractKeywords = (text: string): string[] => {
+    if (!text) return [];
+    
+    // 简单的关键词提取逻辑
+    const stopWords = new Set(['的', '是', '在', '有', '和', '对', '为', '以', '及', '等', '了', '个', '要', '我', '他', '她', '这', '那', '会', '能', '可', '就', '都', '也', '还', '只', '很', '更', '最', '非常', '所以', '因为', '如果', '但是', '然后', '现在', '已经', '一直', '一些', '一个', 'one', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those']);
+    
+    return text
+      .split(/[\s\n\r\t\.,;:!?()（），。；：！？]+/)
+      .filter(word => word.length > 1 && !stopWords.has(word.toLowerCase()))
+      .reduce((acc: string[], word: string) => {
+        if (!acc.includes(word) && acc.length < 10) {
+          acc.push(word);
+        }
+        return acc;
+      }, []);
+  };
+
   // 将任务数据转换为TranscriptionData格式
   const transcriptionData: TranscriptionData = {
     id: task.id,
@@ -285,8 +303,14 @@ ${task.result.segments.map((seg, index) => {
     duration: task.result.duration,
     language: task.result.language,
     confidence: task.result.confidence,
-    summary: task.summary?.text,
-    keywords: [],
+    // 修复：传递完整的摘要对象而不是只传递文本
+    summary: task.summary ? {
+      text: task.summary.text,
+      model: task.summary.model,
+      created_at: task.summary.created_at
+    } : undefined,
+    // 修复：从转录文本中提取关键词
+    keywords: task.summary ? extractKeywords(task.result.text) : [],
   };
 
   return (

@@ -18,7 +18,11 @@ export interface TranscriptionData {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   text?: string;
   segments?: AudioSegment[];
-  summary?: string;
+  summary?: {
+    text: string;
+    model: string;
+    created_at: string;
+  } | string;
   keywords?: string[];
   audioUrl?: string;
   createdAt: string;
@@ -52,11 +56,13 @@ export const TranscriptionDetail: React.FC<TranscriptionDetailProps> = ({
   const [activeTab, setActiveTab] = useState<'transcription' | 'summary' | 'segments'>('transcription');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<SummaryData>({
-    summary: transcription.summary ? {
-      text: transcription.summary,
-      model: 'unknown',
-      created_at: new Date().toISOString()
-    } : undefined,
+    summary: transcription.summary ? (
+      typeof transcription.summary === 'string' ? {
+        text: transcription.summary,
+        model: 'unknown',
+        created_at: new Date().toISOString()
+      } : transcription.summary
+    ) : undefined,
     keywords: transcription.keywords,
   });
   const [expandedSegment, setExpandedSegment] = useState<number | null>(null);
@@ -106,7 +112,11 @@ export const TranscriptionDetail: React.FC<TranscriptionDetailProps> = ({
       const result = await response.json();
       if (result.success && result.data) {
         setSummaryData({
-          summary: result.data.summary,
+          summary: {
+            text: result.data.summary,
+            model: result.data.model || 'unknown',
+            created_at: result.data.createdAt || new Date().toISOString()
+          },
           keywords: result.data.keywords,
         });
       }

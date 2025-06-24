@@ -68,7 +68,65 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
 
   const currentMapping = currentTask ? getProgressMapping(currentTask.progress) : { stage: -1, stageProgress: 0 }
   const currentStageIndex = currentMapping.stage
-  const estimatedMinutes = currentTask?.estimatedTime ? Math.ceil(currentTask.estimatedTime / 60) : 2
+  
+  // 🔧 修复时间估算逻辑 - 基于文件大小和音频时长计算合理的估算时间
+  const calculateEstimatedMinutes = () => {
+    if (!currentTask) return 2
+    
+    // 如果后端提供了估算时间，使用后端数据
+    if (currentTask.estimatedTime) {
+      return Math.ceil(currentTask.estimatedTime / 60)
+    }
+    
+    // 获取音频时长（从任务信息中获取，或根据文件大小粗略估算）
+    const getAudioDurationMinutes = (): number => {
+      if (!currentTask) return 10 // 默认10分钟
+      
+      // 如果任务中已有音频时长信息
+      if (currentTask.duration) {
+        // duration 格式可能是 "3:45" 或 "0:03:45"
+        const parts = currentTask.duration.split(':').map(Number)
+        if (parts.length === 2) {
+          return parts[0] + parts[1] / 60 // 分:秒
+        } else if (parts.length === 3) {
+          return parts[0] * 60 + parts[1] + parts[2] / 60 // 时:分:秒
+        }
+      }
+      
+      // 如果没有时长信息，根据文件大小粗略估算（1MB ≈ 1分钟音频）
+      const file = files.find(f => f.name === currentTask.filename)
+      const fileSizeMB = file ? file.size / (1024 * 1024) : 10
+      return fileSizeMB * 1.0 // 假设1MB ≈ 1分钟音频
+    }
+    
+    const audioDurationMinutes = getAudioDurationMinutes()
+    
+    // 根据不同引擎的转录速度比例（相对于音频实际时长）
+    const engineSpeedRatio = {
+      'faster-whisper': 0.5,  // 转录时间 = 音频时长 × 0.5（比音频快2倍）
+      'whisper-cpp': 1.0,     // 转录时间 = 音频时长 × 1.0（与音频等长）
+      'openai': 0.3           // 转录时间 = 音频时长 × 0.3（比音频快3倍）
+    }
+    
+    const engine = (currentTask.engine as keyof typeof engineSpeedRatio) || 'faster-whisper'
+    const baseMinutes = audioDurationMinutes * engineSpeedRatio[engine]
+    
+    // 根据当前进度调整剩余时间
+    const progress = Math.max(currentTask.progress, 1) // 避免除零
+    const totalEstimatedMinutes = Math.max(baseMinutes, 0.5) // 最少30秒
+    const remainingProgress = (100 - progress) / 100
+    const remainingMinutes = totalEstimatedMinutes * remainingProgress
+    
+    // 在不同阶段加上额外时间
+    let stageExtraTime = 0
+    if (currentStageIndex === 4) { // AI摘要阶段
+      stageExtraTime += 1 // 额外1分钟
+    }
+    
+    return Math.max(Math.ceil(remainingMinutes + stageExtraTime), 0.5)
+  }
+  
+  const estimatedMinutes = calculateEstimatedMinutes()
   const elapsedSeconds = currentTask?.elapsedTime || 75
 
   return (
@@ -215,7 +273,13 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
                     {stages[currentStageIndex]?.name || '语音识别'}进行中...
                   </p>
                   <p className="text-blue-700 mt-1">
-                    预计剩余时间: 约 {estimatedMinutes} 分钟
+                    预计剩余时间: 约 {
+                      estimatedMinutes < 1 
+                        ? '不到1分钟' 
+                        : estimatedMinutes === 1 
+                        ? '1分钟' 
+                        : `${estimatedMinutes}分钟`
+                    }
                   </p>
                 </div>
               </div>
