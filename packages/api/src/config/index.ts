@@ -1,8 +1,18 @@
 import { config } from 'dotenv';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 // 加载环境变量
 config();
+
+// 路径解析助手函数
+const resolveUploadDir = (): string => {
+  if (process.env.UPLOAD_DIR) {
+    return resolve(process.env.UPLOAD_DIR);
+  }
+  
+  // 默认路径：从API包目录向上两级到项目根目录的uploads文件夹
+  return resolve(process.cwd(), '../../uploads');
+};
 
 export interface AppConfig {
   env: string;
@@ -90,7 +100,7 @@ export const appConfig: AppConfig = {
       'audio/x-aiff',
       'application/octet-stream', // 兼容一些音频文件被识别为此类型
     ],
-    uploadDir: process.env.UPLOAD_DIR || join(process.cwd(), 'data', 'uploads'),
+    uploadDir: resolveUploadDir(),
   },
   ai: {
     providers: {

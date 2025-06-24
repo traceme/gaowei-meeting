@@ -31,6 +31,11 @@ interface TranscriptionTask {
   created_at: string;
   updated_at: string;
   audio_path?: string;
+  summary?: {
+    text: string;
+    model: string;
+    created_at: string;
+  };
 }
 
 const ResultPage: React.FC = () => {
@@ -260,10 +265,8 @@ ${task.result.segments.map((seg, index) => {
     );
   }
 
-  // 构建音频URL - 如果有audio_path则使用静态文件服务，否则为undefined
-  const audioUrl = task.audio_path 
-    ? `http://localhost:3000/uploads/${task.audio_path.split('/').pop()}` 
-    : undefined;
+  // 构建音频URL - 使用相对URL让Vite代理处理
+  const audioUrl = `/uploads/${task.filename}`;
 
   // 将任务数据转换为TranscriptionData格式
   const transcriptionData: TranscriptionData = {
@@ -282,6 +285,8 @@ ${task.result.segments.map((seg, index) => {
     duration: task.result.duration,
     language: task.result.language,
     confidence: task.result.confidence,
+    summary: task.summary?.text,
+    keywords: [],
   };
 
   return (

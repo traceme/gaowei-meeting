@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 
 export interface AudioSegment {
   start: number;
@@ -16,13 +16,17 @@ export interface VidstackAudioPlayerProps {
   className?: string;
 }
 
-export const VidstackAudioPlayer: React.FC<VidstackAudioPlayerProps> = ({
+export interface VidstackAudioPlayerRef {
+  seekTo: (time: number) => void;
+}
+
+export const VidstackAudioPlayer = forwardRef<VidstackAudioPlayerRef, VidstackAudioPlayerProps>(({
   audioUrl,
   segments,
   onTimeUpdate,
   onSegmentClick,
   className = '',
-}) => {
+}, ref) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -44,6 +48,11 @@ export const VidstackAudioPlayer: React.FC<VidstackAudioPlayerProps> = ({
       audioRef.current.currentTime = time;
     }
   };
+
+  // 暴露方法给外部调用
+  useImperativeHandle(ref, () => ({
+    seekTo,
+  }));
 
   // 格式化时间显示
   const formatTime = (seconds: number) => {
@@ -273,6 +282,8 @@ export const VidstackAudioPlayer: React.FC<VidstackAudioPlayerProps> = ({
       </div>
     </div>
   );
-};
+});
+
+VidstackAudioPlayer.displayName = 'VidstackAudioPlayer';
 
 export default VidstackAudioPlayer; 

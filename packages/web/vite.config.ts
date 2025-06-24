@@ -19,9 +19,17 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // API路由代理
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        timeout: 120000, // 2分钟超时，适配长时间的AI处理
+      },
+      // 静态文件代理（音频文件等）
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        timeout: 30000, // 30秒超时，适配大文件下载
       },
     },
   },

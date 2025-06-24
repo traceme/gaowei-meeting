@@ -91,6 +91,7 @@ export class DatabaseManager {
         status TEXT DEFAULT 'pending',
         progress INTEGER DEFAULT 0,
         result TEXT,
+        summary TEXT,
         error TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
@@ -173,6 +174,19 @@ export class DatabaseManager {
       VALUES (?, ?, ?, ?, ?)
     `);
     defaultSettings.run('default', 'openai', 'gpt-3.5-turbo', 'small', '{}');
+
+    // 数据库迁移：为transcription_tasks表添加summary字段（如果不存在）
+    try {
+      this.db.exec(`
+        ALTER TABLE transcription_tasks ADD COLUMN summary TEXT;
+      `);
+      console.log('✅ 已为transcription_tasks表添加summary字段');
+    } catch (error: any) {
+      // 字段已存在或其他错误，忽略
+      if (!error.message?.includes('duplicate column name')) {
+        console.warn('迁移警告:', error.message);
+      }
+    }
   }
 
   // ===== 会议管理 =====
@@ -319,11 +333,23 @@ export class DatabaseManager {
     `);
     const task = stmt.get(taskId) as TranscriptionTask | null;
     
-    if (task && task.result && typeof task.result === 'string') {
-      try {
-        task.result = JSON.parse(task.result);
-      } catch (error) {
-        console.warn(`Failed to parse result JSON for task ${taskId}:`, error);
+    if (task) {
+      // 解析result字段
+      if (task.result && typeof task.result === 'string') {
+        try {
+          task.result = JSON.parse(task.result);
+        } catch (error) {
+          console.warn(`Failed to parse result JSON for task ${taskId}:`, error);
+        }
+      }
+      
+      // 解析summary字段
+      if (task.summary && typeof task.summary === 'string') {
+        try {
+          task.summary = JSON.parse(task.summary as unknown as string);
+        } catch (error) {
+          console.warn(`Failed to parse summary JSON for task ${taskId}:`, error);
+        }
       }
     }
     
@@ -384,7 +410,8 @@ export class DatabaseManager {
     // 解析JSON字段
     return tasks.map(task => ({
       ...task,
-      result: task.result ? JSON.parse(task.result as string) : undefined,
+      result: task.result ? JSON.parse(task.result as unknown as string) : undefined,
+      summary: task.summary ? JSON.parse(task.summary as unknown as string) : undefined,
     }));
   }
 

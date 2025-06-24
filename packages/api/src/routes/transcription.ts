@@ -8,6 +8,7 @@ import {
   TranscriptionRouter,
   type TranscriptionOptions,
 } from '../services/transcription.js';
+import { AISummaryGenerator } from '../services/ai-summary.js';
 import { appConfig } from '../config/index.js';
 import { sendSuccess, sendError } from '../middleware/index.js';
 import type { WhisperEngineType } from '@gaowei/shared-types';
@@ -15,6 +16,7 @@ import type { WhisperEngineType } from '@gaowei/shared-types';
 const router: IRouter = Router();
 let meetingManager: MeetingManager;
 let transcriptionRouter: TranscriptionRouter;
+let aiSummaryGenerator: AISummaryGenerator;
 
 // 获取当前选择的引擎
 async function getCurrentEngine(): Promise<WhisperEngineType> {
@@ -38,7 +40,10 @@ const initializeServices = () => {
   if (!transcriptionRouter) {
     transcriptionRouter = new TranscriptionRouter(appConfig);
   }
-  return { meetingManager, transcriptionRouter };
+  if (!aiSummaryGenerator) {
+    aiSummaryGenerator = new AISummaryGenerator(appConfig);
+  }
+  return { meetingManager, transcriptionRouter, aiSummaryGenerator };
 };
 
 // 文件上传和转录
@@ -164,6 +169,103 @@ router.get('/', async (req: Request, res: Response) => {
     );
   }
 });
+
+// 为转录任务生成AI摘要
+router.post('/:taskId/summary', async (req: Request, res: Response) => {
+  try {
+    const { meetingManager, aiSummaryGenerator } = initializeServices();
+    const { taskId } = req.params;
+    const { model } = req.body;
+
+    if (!taskId) {
+      return sendError(res, '任务ID不能为空', 400);
+    }
+
+    // 获取转录任务
+    const task = await meetingManager.getTranscriptionTask(taskId);
+    if (!task) {
+      return sendError(res, '转录任务不存在', 404);
+    }
+
+    if (task.status !== 'completed' || !task.result?.text) {
+      return sendError(res, '转录任务未完成或没有转录文本', 400);
+    }
+
+    console.log(`🤖 开始为任务 ${taskId} 生成AI摘要...`);
+
+    // 生成摘要
+    const summaryResult = await aiSummaryGenerator.generateSummary(
+      task.result.text,
+      model
+    );
+
+    // 提取关键词（简单实现）
+    const keywords = extractKeywords(task.result.text);
+
+    // 更新任务记录，添加摘要信息
+    await meetingManager.updateTranscriptionTask(taskId, {
+      result: {
+        ...task.result,
+        // summary和keywords不在TranscriptionResult中，我们通过其他方式存储
+      },
+      // 将摘要信息存储在任务级别
+      summary: {
+        text: summaryResult.text,
+        model: summaryResult.model,
+        created_at: summaryResult.createdAt,
+      },
+    });
+
+    console.log(`✅ 任务 ${taskId} AI摘要生成完成`);
+
+    sendSuccess(res, {
+      summary: summaryResult.text,
+      keywords: keywords,
+      model: summaryResult.model,
+      provider: summaryResult.provider,
+      createdAt: summaryResult.createdAt,
+    });
+  } catch (error) {
+    console.error(`❌ 任务 ${req.params.taskId} AI摘要生成失败:`, error);
+    sendError(
+      res,
+      error instanceof Error ? error.message : 'AI摘要生成失败',
+      500
+    );
+  }
+});
+
+// 简单的关键词提取函数
+function extractKeywords(text: string): string[] {
+  // 这是一个简单的关键词提取实现
+  // 在实际项目中，你可能想要使用更复杂的NLP库
+  const words = text
+    .toLowerCase()
+    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s]/g, '') // 保留中文、英文、数字和空格
+    .split(/\s+/)
+    .filter(word => word.length > 1); // 过滤掉单字符
+
+  // 计算词频
+  const wordCount: { [key: string]: number } = {};
+  words.forEach(word => {
+    wordCount[word] = (wordCount[word] || 0) + 1;
+  });
+
+  // 过滤常见停用词（简化版）
+  const stopWords = new Set([
+    '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '这个', '那', '那个', '我们', '你们', '他们', '她们', '它们', '这些', '那些', '什么', '怎么', '为什么', '哪里', '怎样', '多少',
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'
+  ]);
+
+  // 获取频率最高的关键词
+  const filteredWords = Object.entries(wordCount)
+    .filter(([word, count]) => !stopWords.has(word) && count >= 2) // 至少出现2次
+    .sort(([, a], [, b]) => b - a) // 按频率降序排列
+    .slice(0, 10) // 取前10个
+    .map(([word]) => word);
+
+  return filteredWords;
+}
 
 // 后台转录处理函数
 async function processTranscriptionInBackground(

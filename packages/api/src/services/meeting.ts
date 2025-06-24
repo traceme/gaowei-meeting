@@ -7,6 +7,8 @@ import type {
   ProcessTask,
   TranscriptionResult,
 } from '@gaowei/shared-types';
+import { AISummaryGenerator } from './ai-summary.js';
+import { appConfig } from '../config/index.js';
 
 export interface MeetingData {
   id: string;
@@ -24,10 +26,14 @@ export interface MeetingData {
 // 会议管理器 - 基于SQLite数据库
 export class MeetingManager {
   private db: DatabaseManager;
+  private aiSummaryGenerator: AISummaryGenerator;
 
   constructor(dbPath?: string) {
     this.db = new DatabaseManager(dbPath);
+    // 初始化AI摘要生成器
+    this.aiSummaryGenerator = new AISummaryGenerator(appConfig);
     console.log('📊 MeetingManager 已初始化并连接到数据库');
+    console.log('🤖 AI摘要生成器已初始化');
   }
 
   // 会议管理
@@ -191,19 +197,26 @@ export class MeetingManager {
     const task = this.db.getTranscriptionTask(id);
     if (!task) return null;
 
-    // 转换更新数据格式
+    // 转换更新数据格式，包括summary字段
     const dbUpdates: Partial<TranscriptionTask> = {};
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.progress !== undefined) dbUpdates.progress = updates.progress;
     if (updates.result !== undefined) dbUpdates.result = updates.result;
+    if (updates.summary !== undefined) dbUpdates.summary = updates.summary;
     if (updates.error !== undefined) dbUpdates.error = updates.error;
 
     const success = this.db.updateTranscriptionTask(id, dbUpdates);
     if (!success) return null;
 
-    // 如果转录完成，更新会议数据
+    // 如果转录完成，自动生成AI摘要并更新会议数据
     const updatedTask = this.db.getTranscriptionTask(id);
-    if (updatedTask?.status === 'completed' && updatedTask.result) {
+    if (updatedTask?.status === 'completed' && updatedTask.result && updatedTask.result.text) {
+      // 异步生成AI摘要，不阻塞主流程
+      this.generateAndSaveSummary(id, updatedTask.result.text).catch(error => {
+        console.error(`为任务 ${id} 生成AI摘要失败:`, error);
+      });
+
+      // 更新会议数据
       await this.updateMeeting(task.meeting_id, {
         transcription: updatedTask.result,
         status: 'completed',
@@ -211,6 +224,35 @@ export class MeetingManager {
     }
 
     return updatedTask;
+  }
+
+  // 生成并保存AI摘要的私有方法
+  private async generateAndSaveSummary(taskId: string, transcriptText: string): Promise<void> {
+    try {
+      console.log(`🤖 开始为任务 ${taskId} 生成AI摘要...`);
+      
+      // 生成AI摘要
+      const summaryResult = await this.aiSummaryGenerator.generateSummary(transcriptText);
+      
+      // 构造摘要对象
+      const summary = {
+        text: summaryResult.text,
+        model: summaryResult.model,
+        created_at: summaryResult.createdAt,
+      };
+
+      // 保存摘要到数据库
+      const updateSuccess = this.db.updateTranscriptionTask(taskId, { summary });
+      
+      if (updateSuccess) {
+        console.log(`✅ 任务 ${taskId} 的AI摘要已生成并保存`);
+      } else {
+        console.error(`❌ 保存任务 ${taskId} 的AI摘要失败`);
+      }
+    } catch (error) {
+      console.error(`生成AI摘要失败:`, error);
+      // 可以考虑保存错误信息到数据库
+    }
   }
 
   async listTranscriptionTasks(

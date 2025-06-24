@@ -13,6 +13,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import type { ApiResponse, ApiError } from '@gaowei/shared-types';
 import { appConfig } from '../config/index.js';
+import { CONFIG_CONSTANTS } from '../config/constants.js';
 
 // 确保上传目录存在
 if (!existsSync(appConfig.upload.uploadDir)) {
@@ -23,8 +24,9 @@ if (!existsSync(appConfig.upload.uploadDir)) {
 export const corsMiddleware = cors({
   origin: appConfig.cors.origin,
   credentials: appConfig.cors.credentials,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: [...CONFIG_CONSTANTS.CORS.ALLOWED_METHODS],
+  allowedHeaders: [...CONFIG_CONSTANTS.CORS.ALLOWED_HEADERS],
+  exposedHeaders: [...CONFIG_CONSTANTS.CORS.EXPOSED_HEADERS],
 });
 
 // 安全中间件
@@ -200,6 +202,29 @@ export const validateJson: RequestHandler = (
   next();
 };
 
+// 静态文件服务配置
+export const createStaticFileMiddleware = (uploadDir: string): RequestHandler => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const cacheMaxAge = isProduction 
+    ? CONFIG_CONSTANTS.STATIC_FILES.CACHE.PRODUCTION_MAX_AGE 
+    : CONFIG_CONSTANTS.STATIC_FILES.CACHE.DEVELOPMENT_MAX_AGE;
+
+  return express.static(uploadDir, {
+    dotfiles: 'deny',
+    index: false,
+    redirect: false,
+    maxAge: isProduction ? '1d' : 0,
+    setHeaders: (res: Response, path: string) => {
+      // 为音频文件设置适当的headers
+      if (path.match(CONFIG_CONSTANTS.STATIC_FILES.AUDIO_EXTENSIONS)) {
+        res.set('Accept-Ranges', 'bytes');
+        res.set('Content-Disposition', CONFIG_CONSTANTS.STATIC_FILES.SECURITY.CONTENT_DISPOSITION);
+        res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+      }
+    }
+  });
+};
+
 // 设置所有中间件的便捷函数
 export const setupMiddleware = (
   app: express.Application,
@@ -215,6 +240,9 @@ export const setupMiddleware = (
   // 解析中间件
   app.use(jsonMiddleware);
   app.use(urlencodedMiddleware);
+
+  // 静态文件服务 - 提供上传的音频文件访问
+  app.use('/uploads', createStaticFileMiddleware(config.upload.uploadDir));
 
   // 文件上传中间件（仅对特定路由）
   app.use('/api/upload', uploadMiddleware.single('file'));
