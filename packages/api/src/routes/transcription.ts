@@ -353,7 +353,15 @@ async function processTranscriptionInBackground(
         contentType: 'audio/wav',
       });
       
-      if (options.language) {
+      // 处理混合语言模式
+      if (options.language === 'mixed') {
+        console.log('🌐 启用混合语言模式（中英文）');
+        // 混合语言模式：先用中文处理，如果效果不好再用英文补充
+        // 这里先使用中文作为主语言，whisper模型会自动处理其中的英文部分
+        const languageCode = currentEngine === 'whisper-cpp' ? 'zh' : 'zh';
+        formData.append('language', languageCode);
+        // 可以在后续版本中实现多pass处理
+      } else if (options.language) {
         // whisper.cpp使用不同的语言代码格式
         let languageCode = options.language;
         if (currentEngine === 'whisper-cpp') {

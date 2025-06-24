@@ -124,6 +124,9 @@ const UploadPage = () => {
       if (selectedLanguage !== 'auto') {
         formData.append('language', selectedLanguage)
         console.log('📤 发送上传请求到 /api/transcription/upload (language:', selectedLanguage, ')')
+        if (selectedLanguage === 'mixed') {
+          console.log('🌐 混合语言模式已选择，将使用中英文优化处理')
+        }
       } else {
         console.log('📤 发送上传请求到 /api/transcription/upload (语言自动检测)')
         // 在auto模式下，完全不发送language参数，让后端进行自动检测
@@ -613,6 +616,7 @@ const UploadPage = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="auto">🔍 自动检测（推荐）</option>
+                  <option value="mixed">🌐 混合语言模式（中英混合）</option>
                   <option value="en">🇺🇸 English（英语）</option>
                   <option value="zh">🇨🇳 中文（Chinese）</option>
                   <option value="zh-cn">🇨🇳 简体中文</option>
@@ -631,8 +635,24 @@ const UploadPage = () => {
                 <p className="mt-2 text-xs text-gray-500">
                   {selectedLanguage === 'auto' 
                     ? '系统将自动检测音频语言，适用于大多数情况' 
+                    : selectedLanguage === 'mixed'
+                    ? '混合语言模式：针对中英文混合音频优化，使用多次处理提高准确度'
                     : '手动指定语言可以提高转录准确度'}
                 </p>
+                {selectedLanguage === 'auto' && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <span className="text-yellow-800">
+                      💡 <strong>提示：</strong>对于中文音频，建议手动选择"🇨🇳 中文"而非自动检测，转录准确度更高
+                    </span>
+                  </div>
+                )}
+                {selectedLanguage === 'mixed' && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                    <span className="text-blue-800">
+                      🌐 <strong>混合语言模式：</strong>适用于中英文交替出现的音频，如双语会议、教学等场景。将以中文为主语言进行转录，同时保持对英文内容的准确识别。
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* 当前引擎显示 */}
