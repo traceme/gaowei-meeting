@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ConfirmModal, Toast } from '../components/Modal';
 
 interface TranscriptionTask {
@@ -35,6 +36,7 @@ interface TasksApiResponse {
 }
 
 const HistoryPage: React.FC = () => {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState<TranscriptionTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -217,7 +219,7 @@ const HistoryPage: React.FC = () => {
       type: 'danger',
       onConfirm: async () => {
         try {
-          console.log('批量删除任务:', Array.from(selectedTasks));
+      console.log('批量删除任务:', Array.from(selectedTasks));
           
           // 并行删除所有选中的任务
           const deletePromises = Array.from(selectedTasks).map(async (taskId) => {
@@ -238,7 +240,7 @@ const HistoryPage: React.FC = () => {
           if (successful.length > 0) {
             const successfulIds = new Set(successful.map(r => r.taskId));
             setTasks(prev => prev.filter(task => !successfulIds.has(task.id)));
-            setSelectedTasks(new Set());
+      setSelectedTasks(new Set());
           }
           
           // 显示结果信息
@@ -269,68 +271,17 @@ const HistoryPage: React.FC = () => {
 
   // 查看任务详情
   const handleViewDetails = (task: TranscriptionTask) => {
-    if (!task.result) return;
-    
-    const detailsContent = `
-文件名: ${task.filename}
-任务ID: ${task.id}
-状态: ${getStatusText(task.status)}
-语言: ${task.result.language}
-时长: ${formatDuration(task)}
-模型: ${task.result.model}
-创建时间: ${formatDate(task.created_at)}
-更新时间: ${formatDate(task.updated_at)}
-
-转录内容:
-${task.result.text}
-
-时间轴信息:
-${task.result.segments.map(seg => `${Math.floor(seg.start/60)}:${String(Math.floor(seg.start%60)).padStart(2,'0')} - ${Math.floor(seg.end/60)}:${String(Math.floor(seg.end%60)).padStart(2,'0')}: ${seg.text}`).join('\n')}
-    `;
-    
-    // 创建一个新窗口显示详情
-    const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
-    if (newWindow) {
-      newWindow.document.write(`
-        <html>
-          <head>
-            <title>转录详情 - ${task.filename}</title>
-            <meta charset="UTF-8">
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
-              .header { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-              .content { white-space: pre-wrap; }
-              .segment { margin: 5px 0; padding: 5px; background: #f9f9f9; border-left: 3px solid #007bff; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>转录详情</h1>
-              <p><strong>文件名:</strong> ${task.filename}</p>
-              <p><strong>任务ID:</strong> ${task.id}</p>
-              <p><strong>状态:</strong> ${getStatusText(task.status)}</p>
-              <p><strong>语言:</strong> ${task.result.language}</p>
-              <p><strong>时长:</strong> ${formatDuration(task)}</p>
-              <p><strong>模型:</strong> ${task.result.model}</p>
-              <p><strong>创建时间:</strong> ${formatDate(task.created_at)}</p>
-            </div>
-            <div class="content">
-              <h2>完整转录内容</h2>
-              <p>${task.result.text}</p>
-              
-              <h2>分段信息</h2>
-              ${task.result.segments.map(seg => `
-                <div class="segment">
-                  <strong>${Math.floor(seg.start/60)}:${String(Math.floor(seg.start%60)).padStart(2,'0')} - ${Math.floor(seg.end/60)}:${String(Math.floor(seg.end%60)).padStart(2,'0')}</strong><br>
-                  ${seg.text}
-                </div>
-              `).join('')}
-            </div>
-          </body>
-        </html>
-      `);
-      newWindow.document.close();
+    if (!task.result || task.status !== 'completed') {
+      setToast({
+        isOpen: true,
+        message: '任务尚未完成或结果不可用',
+        type: 'warning',
+      });
+      return;
     }
+    
+    // 导航到详细结果页面
+    navigate(`/result/${task.id}`);
   };
 
   // 下载转录文件
@@ -429,10 +380,10 @@ ${task.result.segments.map(seg =>
     
     if (task.result?.segments && task.result.segments.length > 0) {
       const lastSegment = task.result.segments[task.result.segments.length - 1];
-      const totalSeconds = lastSegment?.end || 0;
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = Math.floor(totalSeconds % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const totalSeconds = lastSegment?.end || 0;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
     
     return '未知';

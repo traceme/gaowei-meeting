@@ -80,7 +80,8 @@ router.post('/upload', async (req: Request, res: Response) => {
       req.file.path, // 使用文件路径而不是buffer
       req.file.originalname,
       {
-        language: language as string,
+        // 只有在语言不是'auto'且存在时才传递语言参数
+        ...(language && language !== 'auto' ? { language: language as string } : {}),
       }
     );
 

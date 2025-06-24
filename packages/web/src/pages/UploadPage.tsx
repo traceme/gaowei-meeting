@@ -41,6 +41,7 @@ const UploadPage = () => {
   const [currentTask, setCurrentTask] = useState<TranscriptionTask | null>(null)
   const [showProgress, setShowProgress] = useState(false)
   const [currentEngine, setCurrentEngine] = useState<WhisperEngineType>('faster-whisper') // 默认引擎
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('auto') // 添加语言选择状态
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 获取当前选择的引擎
@@ -109,6 +110,7 @@ const UploadPage = () => {
     
     console.log('🚀 开始上传文件:', file.name, file.size, 'bytes')
     console.log('🔧 使用引擎:', currentEngine)
+    console.log('🌐 选择语言:', selectedLanguage)
     
     setIsUploading(true)
     setShowProgress(true)
@@ -117,9 +119,15 @@ const UploadPage = () => {
       // 准备FormData
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('language', 'zh-cn') // 明确指定使用简体中文
       
-      console.log('📤 发送上传请求到 /api/transcription/upload (language: zh-cn)')
+      // 只有在用户明确选择语言时才添加语言参数，否则让引擎自动检测
+      if (selectedLanguage !== 'auto') {
+        formData.append('language', selectedLanguage)
+        console.log('📤 发送上传请求到 /api/transcription/upload (language:', selectedLanguage, ')')
+      } else {
+        console.log('📤 发送上传请求到 /api/transcription/upload (语言自动检测)')
+        // 在auto模式下，完全不发送language参数，让后端进行自动检测
+      }
       
       // 上传文件到后端API
       const response = await fetch('/api/transcription/upload', {
@@ -584,6 +592,66 @@ const UploadPage = () => {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 语言选择设置 */}
+      {selectedFiles.length > 0 && !isUploading && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">转录设置</h3>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-start space-x-6">
+              {/* 语言选择 */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  🌐 音频语言
+                </label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="auto">🔍 自动检测（推荐）</option>
+                  <option value="en">🇺🇸 English（英语）</option>
+                  <option value="zh">🇨🇳 中文（Chinese）</option>
+                  <option value="zh-cn">🇨🇳 简体中文</option>
+                  <option value="zh-tw">🇹🇼 繁体中文</option>
+                  <option value="ja">🇯🇵 日语（Japanese）</option>
+                  <option value="ko">🇰🇷 한국어（Korean）</option>
+                  <option value="fr">🇫🇷 Français（法语）</option>
+                  <option value="de">🇩🇪 Deutsch（德语）</option>
+                  <option value="es">🇪🇸 Español（西班牙语）</option>
+                  <option value="it">🇮🇹 Italiano（意大利语）</option>
+                  <option value="pt">🇵🇹 Português（葡萄牙语）</option>
+                  <option value="ru">🇷🇺 Русский（俄语）</option>
+                  <option value="ar">🇸🇦 العربية（阿拉伯语）</option>
+                  <option value="hi">🇮🇳 हिन्दी（印地语）</option>
+                </select>
+                <p className="mt-2 text-xs text-gray-500">
+                  {selectedLanguage === 'auto' 
+                    ? '系统将自动检测音频语言，适用于大多数情况' 
+                    : '手动指定语言可以提高转录准确度'}
+                </p>
+              </div>
+
+              {/* 当前引擎显示 */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  🔧 转录引擎
+                </label>
+                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <span className="font-medium text-gray-900">
+                    {currentEngine === 'faster-whisper' && '⚡ Faster-Whisper'}
+                    {currentEngine === 'whisper-cpp' && '🚀 Whisper.cpp'}
+                    {currentEngine === 'openai' && '🌐 OpenAI Whisper'}
+            </span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    在设置页面可以切换引擎
+                  </p>
+                </div>
+              </div>
+          </div>
           </div>
         </div>
       )}

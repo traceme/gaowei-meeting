@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import HistoryPage from './pages/HistoryPage';
 import SettingsPage from './pages/SettingsPage';
+import ResultPage from './pages/ResultPage';
 
 // 404页面
 function NotFoundPage() {
@@ -33,6 +34,7 @@ function App() {
           <Route path='/' element={<HomePage />} />
           <Route path='/upload' element={<UploadPage />} />
           <Route path='/history' element={<HistoryPage />} />
+          <Route path='/result/:taskId' element={<ResultPage />} />
           <Route path='/settings' element={<SettingsPage />} />
           <Route path='*' element={<NotFoundPage />} />
         </Routes>

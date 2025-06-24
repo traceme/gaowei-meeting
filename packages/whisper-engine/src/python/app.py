@@ -174,7 +174,7 @@ def update_task_progress(task_id: str, progress: int, status: str = 'processing'
         processing_status[task_id]['updated_at'] = datetime.now().isoformat()
         logger.info(f"任务 {task_id}: {progress}% - {progress_text or status}")
 
-def process_audio_with_progress(task_id: str, file_path: str, language: str = None):
+def process_audio_with_progress(task_id: str, file_path: str, language: str = None, word_timestamps: bool = False):
     """带进度更新的音频处理"""
     try:
         # 1. 开始处理 (10%)
@@ -189,12 +189,19 @@ def process_audio_with_progress(task_id: str, file_path: str, language: str = No
         # 3. 开始转录 (30%)
         update_task_progress(task_id, 30, 'processing', '语音识别进行中...')
         
-        # 执行转录
+        # 执行转录，支持词级时间戳
+        # 处理语言参数 - 如果是'auto'或None则让引擎自动检测
+        if language == 'auto':
+            language = None  # 转换为None让引擎自动检测
+            
         if language == "zh-cn":
             # 对于简体中文，使用中文转录
-            segments, info = model.transcribe(file_path, language="zh")
+            segments, info = model.transcribe(file_path, language="zh", word_timestamps=word_timestamps)
+        elif language is None:
+            # 自动检测语言
+            segments, info = model.transcribe(file_path, word_timestamps=word_timestamps)
         else:
-            segments, info = model.transcribe(file_path, language=language)
+            segments, info = model.transcribe(file_path, language=language, word_timestamps=word_timestamps)
         
         # 4. 转录进行中进度更新
         segments_list = list(segments)
@@ -206,11 +213,27 @@ def process_audio_with_progress(task_id: str, file_path: str, language: str = No
             progress = 30 + int((i + 1) / total_segments * 40)
             update_task_progress(task_id, progress, 'processing', f'处理音频片段 {i+1}/{total_segments}...')
             
-            processed_segments.append({
+            # 构建segment数据，包含词级时间戳
+            segment_data = {
                 "start": segment.start,
                 "end": segment.end,
                 "text": segment.text
-            })
+            }
+            
+            # 如果启用了词级时间戳，添加words数组
+            if word_timestamps and hasattr(segment, 'words') and segment.words:
+                words_list = []
+                for word in segment.words:
+                    word_data = {
+                        "word": word.word,
+                        "start": word.start,
+                        "end": word.end,
+                        "probability": word.probability
+                    }
+                    words_list.append(word_data)
+                segment_data["words"] = words_list
+            
+            processed_segments.append(segment_data)
             
             # 短暂延迟以显示进度
             if total_segments > 10:  # 只对长音频显示详细进度
@@ -281,8 +304,14 @@ def transcribe():
     if file.filename == '':
         return jsonify({"error": "Empty filename"}), 400
     
-    # 获取语言参数
+    # 获取语言参数和词级时间戳设置
     language = request.form.get('language', 'auto')
+    word_timestamps = request.form.get('word_timestamps', 'false').lower() == 'true'
+    
+    # 处理语言参数 - 如果是'auto'则不传递语言参数让引擎自动检测
+    whisper_language = None if language == 'auto' else language
+    
+    logger.info(f"转录参数 - 语言: {language} (whisper参数: {whisper_language}), 词级时间戳: {word_timestamps}")
     
     try:
         # 生成任务ID（使用时间戳确保唯一性）
@@ -317,7 +346,7 @@ def transcribe():
         # 在后台线程中处理
         thread = threading.Thread(
             target=process_audio_with_progress,
-            args=(task_id, temp_file_path, language)
+            args=(task_id, temp_file_path, whisper_language, word_timestamps)
         )
         thread.daemon = True
         thread.start()
