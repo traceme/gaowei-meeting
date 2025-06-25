@@ -76,7 +76,7 @@ const HistoryPage: React.FC = () => {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/tasks');
+      const response = await fetch('/api/tasks');
       const apiResponse: TasksApiResponse = await response.json();
       
       if (apiResponse.success && apiResponse.data.tasks) {

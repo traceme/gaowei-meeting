@@ -58,7 +58,7 @@ const ResultPage: React.FC = () => {
   const fetchTask = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3000/api/transcription/${taskId}`);
+      const response = await fetch(`/api/transcription/${taskId}`);
       
       if (!response.ok) {
         throw new Error(`获取任务失败: ${response.statusText}`);
@@ -93,7 +93,7 @@ const ResultPage: React.FC = () => {
     if (!taskId) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'DELETE',
       });
 

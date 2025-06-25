@@ -21,7 +21,7 @@ export interface AppConfig {
     host: string;
   };
   cors: {
-    origin: string[];
+    origin: (string | RegExp)[];
     credentials: boolean;
   };
   database: {
@@ -76,7 +76,16 @@ export const appConfig: AppConfig = {
     host: process.env.SERVER_HOST || 'localhost',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173'],
+    origin: process.env.CORS_ORIGIN?.split(',') || [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://10.2.0.16:5173',
+      'http://0.0.0.0:5173',
+      // 允许本地网络的所有IP访问
+      /^http:\/\/(\d{1,3}\.){3}\d{1,3}:5173$/,
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/
+    ],
     credentials: true,
   },
   database: {
