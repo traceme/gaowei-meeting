@@ -265,8 +265,8 @@ ${task.result.segments.map((seg, index) => {
     );
   }
 
-  // 构建音频URL - 使用相对URL让Vite代理处理
-  const audioUrl = `/uploads/${task.filename}`;
+  // 构建音频URL - 使用实际的文件名而不是原始文件名
+  const audioUrl = `/uploads/${task.actual_filename || task.filename}`;
 
   // 简单的关键词提取函数
   const extractKeywords = (text: string): string[] => {

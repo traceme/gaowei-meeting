@@ -47,6 +47,7 @@ export interface AppConfig {
       ollama?: {
         apiKey?: string;
         baseUrl: string;
+        model?: string;
       };
     };
   };
@@ -120,12 +121,12 @@ export const appConfig: AppConfig = {
           apiKey: process.env.GROQ_API_KEY,
         },
       }),
-      ...(process.env.OLLAMA_BASE_URL && {
-        ollama: {
-          apiKey: process.env.OLLAMA_API_KEY,
-          baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-        },
-      }),
+      // 总是初始化 ollama 配置，因为它是默认的本地服务
+      ollama: {
+        apiKey: process.env.OLLAMA_API_KEY,
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+        model: process.env.OLLAMA_MODEL || 'phi4:14b-q4_K_M',
+      },
     },
   },
   whisper: {

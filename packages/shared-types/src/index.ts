@@ -102,6 +102,9 @@ export interface TranscriptionTask {
   error?: string;
   created_at: string;
   updated_at: string;
+  // 音频文件相关字段
+  audio_path?: string;
+  actual_filename?: string;
 }
 
 // 处理任务类型

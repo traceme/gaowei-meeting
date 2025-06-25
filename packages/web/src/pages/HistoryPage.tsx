@@ -598,7 +598,11 @@ ${task.result.segments.map(seg =>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <h3 className="text-lg font-medium text-gray-900 truncate">
+                            <h3 
+                              className="text-lg font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => handleViewDetails(task)}
+                              title="点击查看详情"
+                            >
                               {task.filename}
                             </h3>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>

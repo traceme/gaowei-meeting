@@ -23,7 +23,7 @@ export class OllamaProvider implements SummaryProvider {
   constructor(config: AppConfig) {
     this.baseURL =
       config.ai.providers.ollama?.baseUrl || 'http://localhost:11434';
-    this.model = 'llama3.2:1b'; // 默认模型
+    this.model = config.ai.providers.ollama?.model || 'phi4:14b-q4_K_M';
   }
 
   async isAvailable(): Promise<boolean> {

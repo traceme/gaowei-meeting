@@ -114,7 +114,20 @@ router.get('/:taskId', async (req: Request, res: Response) => {
       return sendError(res, '转录任务不存在', 404);
     }
 
-    sendSuccess(res, { task });
+    // 同时获取相关会议信息以获取音频路径
+    const meeting = await meetingManager.getMeeting(task.meeting_id);
+    
+    // 构建包含音频路径的完整任务数据
+    const taskWithAudioPath = {
+      ...task,
+      // 从会议的 audio_path 中提取实际文件名
+      audio_path: meeting?.audioPath,
+      // 如果有音频路径，从中提取相对文件名供前端使用
+      actual_filename: meeting?.audioPath ? 
+        meeting.audioPath.split('/').pop() : task.filename,
+    };
+
+    sendSuccess(res, { task: taskWithAudioPath });
   } catch (error) {
     sendError(
       res,
