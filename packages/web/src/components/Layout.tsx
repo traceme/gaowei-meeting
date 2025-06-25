@@ -34,7 +34,7 @@ const Layout = ({ children }: LayoutProps) => {
               </button>
               <Link to="/" className="flex items-center space-x-2 ml-2 md:ml-0">
                 <span className="text-2xl">🤖</span>
-                <span className="text-xl font-bold text-gray-900">高维会议AI</span>
+                <span className="text-xl font-bold text-gray-900">高维会议AI-0.2</span>
               </Link>
             </div>
 

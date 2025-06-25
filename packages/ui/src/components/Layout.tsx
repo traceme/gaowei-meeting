@@ -17,7 +17,7 @@ export interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({
   children,
-  title = '高维会议AI',
+  title = '高维会议AI-0.2',
   showStatus = true,
   statusText = '已连接',
   statusColor = 'green',
