@@ -163,7 +163,7 @@ const UploadPage = () => {
       
       // 使用Base64编码传输中文文件名，避免HTTP传输编码问题
       const originalFilename = file.name;
-      const encodedFilename = btoa(unescape(encodeURIComponent(originalFilename)));
+      const encodedFilename = btoa(encodeURIComponent(originalFilename));
       
       formData.append('file', file)
       formData.append('filename_base64', encodedFilename) // Base64编码的文件名

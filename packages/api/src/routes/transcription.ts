@@ -117,7 +117,7 @@ router.post('/upload', async (req: Request, res: Response) => {
     if (filename_base64) {
       try {
         // 解码Base64文件名
-        const decodedFilename = decodeURIComponent(escape(Buffer.from(filename_base64, 'base64').toString()));
+        const decodedFilename = decodeURIComponent(Buffer.from(filename_base64, 'base64').toString());
         displayFilename = decodedFilename;
         console.log(`📁 文件名Base64解码成功: ${req.file.originalname} -> ${displayFilename}`);
       } catch (error) {

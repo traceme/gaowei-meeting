@@ -52,6 +52,8 @@ export class DatabaseManager {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('cache_size = 1000');
+    // 确保UTF-8编码
+    this.db.pragma('encoding = "UTF-8"');
 
     // 创建会议表
     this.db.exec(`
@@ -338,6 +340,7 @@ export class DatabaseManager {
     try {
       // 验证和处理文件名编码
       safeFilename = Buffer.from(filename, 'utf8').toString('utf8');
+      console.log(`📁 数据库存储文件名: ${safeFilename}`);
     } catch (error) {
       console.warn('文件名编码处理失败，使用安全名称:', error);
       safeFilename = `音频文件_${Date.now()}`;
@@ -392,16 +395,9 @@ export class DatabaseManager {
           fields.push(`${key} = ?`);
           values.push(typeof value === 'string' ? value : JSON.stringify(value));
         } else if (key === 'filename') {
-          // 确保文件名正确处理UTF-8编码
-          let safeFilename: string;
-          try {
-            safeFilename = Buffer.from(value as string, 'utf8').toString('utf8');
-          } catch (error) {
-            console.warn('更新时文件名编码处理失败:', error);
-            safeFilename = value as string; // 使用原值作为备用
-          }
+          // 直接使用传入的文件名，应该已经是正确的UTF-8编码
           fields.push(`${key} = ?`);
-          values.push(safeFilename);
+          values.push(value as string);
         } else {
           fields.push(`${key} = ?`);
           values.push(value);
