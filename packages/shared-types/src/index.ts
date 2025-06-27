@@ -105,6 +105,8 @@ export interface TranscriptionTask {
   // 音频文件相关字段
   audio_path?: string;
   actual_filename?: string;
+  duration?: string; // 音频时长（格式化后的字符串，如 "3:45"）
+  duration_seconds?: number; // 音频时长（秒数）
 }
 
 // 处理任务类型

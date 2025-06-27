@@ -141,10 +141,12 @@ export class MeetingManager {
   // 转录任务管理
   async createTranscriptionTask(
     meetingId: string,
-    filename: string
+    filename: string,
+    duration?: string,
+    durationSeconds?: number
   ): Promise<TranscriptionTask> {
-    const task = this.db.createTranscriptionTask(meetingId, filename);
-    console.log(`🎙️ 创建转录任务: ${filename} (任务ID: ${task.id})`);
+    const task = this.db.createTranscriptionTask(meetingId, filename, duration, durationSeconds);
+    console.log(`🎙️ 创建转录任务: ${filename} (任务ID: ${task.id})${duration ? `, 时长: ${duration}` : ''}`);
     return task;
   }
 
@@ -428,6 +430,43 @@ export class MeetingManager {
           error: error instanceof Error ? error.message : '未知错误',
         },
       };
+    }
+  }
+
+  // 获取所有转录任务列表（用于历史记录页面）
+  async getAllTranscriptionTasks(filters: SearchFilters = {}): Promise<TranscriptionTask[]> {
+    const tasks = this.db.getAllTranscriptionTasks(filters);
+    console.log(`📋 获取转录任务列表，共 ${tasks.length} 条记录`);
+    return tasks;
+  }
+
+  // 删除转录任务（用于历史记录页面）
+  async deleteTask(taskId: string): Promise<boolean> {
+    try {
+      // 获取任务信息
+      const task = this.db.getTranscriptionTask(taskId);
+      if (!task) {
+        console.warn(`⚠️ 任务 ${taskId} 不存在`);
+        return false;
+      }
+
+      // 删除转录任务
+      const success = this.db.deleteTranscriptionTask(taskId);
+      
+      if (success) {
+        console.log(`🗑️ 成功删除转录任务: ${taskId}`);
+        
+        // 可选：检查是否还有其他转录任务关联到同一会议
+        // 如果没有，可以考虑清理会议记录
+        
+        return true;
+      } else {
+        console.error(`❌ 删除转录任务失败: ${taskId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`删除转录任务 ${taskId} 时发生错误:`, error);
+      return false;
     }
   }
 }

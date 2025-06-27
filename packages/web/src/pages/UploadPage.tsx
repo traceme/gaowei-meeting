@@ -34,6 +34,48 @@ interface TranscriptionTask {
   error?: string
 }
 
+// 强化的文件名解码函数  
+const decodeFilename = (filename: string): string => {
+  if (!filename) return '未知文件';
+  
+  try {
+    // 策略1: 如果已经包含中文字符，可能已经是正确编码
+    const chineseRegex = /[\u4e00-\u9fa5]/;
+    if (chineseRegex.test(filename)) {
+      return filename;
+    }
+    
+    // 策略2: 尝试URL解码（针对前端编码的文件名）
+    try {
+      const decoded = decodeURIComponent(filename);
+      if (decoded !== filename && chineseRegex.test(decoded)) {
+        console.log('文件名URL解码成功:', filename, '->', decoded);
+        return decoded;
+      }
+    } catch (e) {
+      // URL解码失败，继续下一个策略
+    }
+    
+    // 策略3: 尝试Base64解码（如果文件名看起来像Base64）
+    try {
+      if (/^[A-Za-z0-9+/]+=*$/.test(filename) && filename.length > 10) {
+        const decoded = decodeURIComponent(escape(atob(filename)));
+        if (chineseRegex.test(decoded)) {
+          console.log('文件名Base64解码成功:', filename, '->', decoded);
+          return decoded;
+        }
+      }
+    } catch (e) {
+      // Base64解码失败，继续下一个策略
+    }
+    
+    return filename;
+  } catch (error) {
+    console.warn('文件名解码失败:', error);
+    return filename;
+  }
+};
+
 const UploadPage = () => {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -116,9 +158,22 @@ const UploadPage = () => {
     setShowProgress(true)
     
     try {
-      // 准备FormData
+      // 准备FormData - 确保文件名正确编码
       const formData = new FormData()
+      
+      // 使用Base64编码传输中文文件名，避免HTTP传输编码问题
+      const originalFilename = file.name;
+      const encodedFilename = btoa(unescape(encodeURIComponent(originalFilename)));
+      
       formData.append('file', file)
+      formData.append('filename_base64', encodedFilename) // Base64编码的文件名
+      
+      console.log('📁 文件信息:', {
+        original: originalFilename,
+        base64: encodedFilename,
+        size: file.size,
+        type: file.type
+      })
       
       // 只有在用户明确选择语言时才添加语言参数，否则让引擎自动检测
       if (selectedLanguage !== 'auto') {
@@ -211,10 +266,12 @@ const UploadPage = () => {
         
         console.log(`📈 任务状态: ${task.status}, 进度: ${task.progress}%`)
         
-        // 更新任务状态，保留引擎信息
+        // 更新任务状态，保留引擎信息和正确的文件名
         setCurrentTask(prevTask => ({
           ...task,
-          engine: prevTask?.engine || currentEngine // 保留之前的引擎信息或使用当前引擎
+          // 保留之前解码的正确文件名，防止被服务器返回的乱码覆盖
+          filename: prevTask?.filename || decodeFilename(task.filename),
+          engine: prevTask?.engine || currentEngine
         }))
         
         // 更新进度条
@@ -339,7 +396,12 @@ const UploadPage = () => {
       const task = result.data?.task || result.task || result
       
       if (task) {
-        setCurrentTask(task)
+        // 保留正确的文件名，防止被服务器返回的乱码覆盖
+        setCurrentTask(prevTask => ({
+          ...task,
+          filename: prevTask?.filename || decodeFilename(task.filename),
+          engine: prevTask?.engine || currentEngine
+        }))
         
         if (task.status === 'completed') {
           // 检查是否需要生成AI摘要
@@ -416,7 +478,7 @@ const UploadPage = () => {
     // 将转录数据转换为TranscriptionData格式
     const transcriptionData: TranscriptionData = {
       id: currentTask.id,
-      filename: currentTask.filename,
+      filename: decodeFilename(currentTask.filename),
       status: 'completed',
       text: currentTask.result.text,
       segments: currentTask.result.segments?.map((seg: any) => ({
@@ -581,7 +643,7 @@ const UploadPage = () => {
                 <div className="flex items-center space-x-3">
                   <div className="text-2xl">🎵</div>
                   <div>
-                    <p className="font-medium text-gray-900">{file.name}</p>
+                    <p className="font-medium text-gray-900">{decodeFilename(file.name)}</p>
                     <p className="text-sm text-gray-500">
                       {formatFileSize(file.size)} • {file.type || '音频文件'}
                     </p>

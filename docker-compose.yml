@@ -16,6 +16,10 @@ services:
       - DATABASE_PATH=/app/data/meetings.db
       - UPLOAD_DIR=/app/uploads
       - LOG_LEVEL=info
+      # UTF-8编码支持
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - PYTHONIOENCODING=utf-8
     volumes:
       # 持久化数据
       - app_data:/app/data
@@ -142,6 +146,10 @@ services:
       - VITE_DEV_PORT=5173
       - DATABASE_PATH=/app/data/meetings.db
       - LOG_LEVEL=debug
+      # UTF-8编码支持
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - PYTHONIOENCODING=utf-8
     volumes:
       # 开发时挂载源代码
       - .:/app

@@ -189,3 +189,6 @@ uploads/
 # 数据库临时文件
 packages/api/data/*.db-shm
 packages/api/data/*.db-wal
+
+# serena pass
+.serena/

@@ -13,6 +13,60 @@ import { appConfig } from '../config/index.js';
 import { sendSuccess, sendError } from '../middleware/index.js';
 import type { WhisperEngineType } from '@gaowei/shared-types';
 
+// 获取音频文件元数据（时长等）的工具函数
+async function getAudioMetadata(filePath: string): Promise<{ duration?: number; format?: string }> {
+  try {
+    // 尝试使用ffprobe获取音频信息（如果可用）
+    const { execSync } = await import('child_process');
+    
+    try {
+      // 使用ffprobe获取精确的音频时长
+      const output = execSync(
+        `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${filePath}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      
+      const duration = parseFloat(output.trim());
+      if (!isNaN(duration) && duration > 0) {
+        console.log(`📊 使用ffprobe获取音频时长: ${duration}秒`);
+        return { duration };
+      }
+    } catch (ffprobeError) {
+      console.warn('⚠️ ffprobe不可用，使用文件大小估算音频时长');
+    }
+    
+    // 回退方案：根据文件大小粗略估算音频时长
+    const { statSync } = await import('fs');
+    const stats = statSync(filePath);
+    const fileSizeMB = stats.size / (1024 * 1024);
+    
+    // 假设音频比特率约为128kbps，计算大概时长
+    // 1MB ≈ 1分钟的音频（在128kbps下）
+    const estimatedDurationMinutes = fileSizeMB * 1.0; // 粗略估算
+    const estimatedDurationSeconds = Math.round(estimatedDurationMinutes * 60);
+    
+    console.log(`📊 根据文件大小估算音频时长: ${estimatedDurationSeconds}秒 (${fileSizeMB.toFixed(1)}MB)`);
+    return { duration: estimatedDurationSeconds };
+    
+  } catch (error) {
+    console.warn('⚠️ 获取音频元数据失败:', error);
+    return {};
+  }
+}
+
+// 格式化音频时长为可读格式
+function formatAudioDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  } else {
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
 const router: IRouter = Router();
 let meetingManager: MeetingManager;
 let transcriptionRouter: TranscriptionRouter;
@@ -55,22 +109,46 @@ router.post('/upload', async (req: Request, res: Response) => {
       return sendError(res, '未上传文件', 400);
     }
 
-    const { meetingId, language } = req.body;
+    const { meetingId, language, filename_base64 } = req.body;
     let currentMeetingId = meetingId;
+    
+    // 处理Base64编码的文件名
+    let displayFilename = req.file.originalname;
+    if (filename_base64) {
+      try {
+        // 解码Base64文件名
+        const decodedFilename = decodeURIComponent(escape(Buffer.from(filename_base64, 'base64').toString()));
+        displayFilename = decodedFilename;
+        console.log(`📁 文件名Base64解码成功: ${req.file.originalname} -> ${displayFilename}`);
+      } catch (error) {
+        console.warn('文件名Base64解码失败:', error);
+        displayFilename = req.file.originalname;
+      }
+    }
+    console.log(`📁 最终使用文件名: ${displayFilename}`);
 
     // 如果没有提供会议ID，创建新会议
     if (!currentMeetingId) {
       const meeting = await meetingManager.createMeeting(
-        `会议转录 - ${req.file.originalname}`,
-        `上传文件: ${req.file.originalname}`
+        `会议转录 - ${displayFilename}`,
+        `上传文件: ${displayFilename}`
       );
       currentMeetingId = meeting.id;
     }
 
-    // 创建转录任务
+    // 获取音频文件元数据（时长等）
+    const audioMetadata = await getAudioMetadata(req.file.path);
+    const duration = audioMetadata.duration;
+    const formattedDuration = duration ? formatAudioDuration(duration) : undefined;
+    
+    console.log(`📊 音频文件信息: ${displayFilename}, 时长: ${formattedDuration || '未知'}`);
+
+    // 创建转录任务，包含音频时长信息
     const task = await meetingManager.createTranscriptionTask(
       currentMeetingId,
-      req.file.originalname
+      displayFilename,
+      formattedDuration,
+      duration
     );
 
     // 更新会议状态
@@ -83,7 +161,7 @@ router.post('/upload', async (req: Request, res: Response) => {
     processTranscriptionInBackground(
       task.id,
       req.file.path, // 使用文件路径而不是buffer
-      req.file.originalname,
+      displayFilename,
       {
         // 只有在语言不是'auto'且存在时才传递语言参数
         ...(language && language !== 'auto' ? { language: language as string } : {}),

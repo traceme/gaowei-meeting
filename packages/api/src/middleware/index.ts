@@ -58,8 +58,28 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
-    const name = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${timestamp}_${name}`);
+    // 修复：保留中文字符，只替换可能引起文件系统问题的特殊字符
+    // 确保文件名正确处理UTF-8编码
+    let safeName: string;
+    try {
+      // 确保originalname是UTF-8编码的字符串
+      const originalName = Buffer.isBuffer(file.originalname) 
+        ? file.originalname.toString('utf8') 
+        : file.originalname;
+      
+      // 只替换文件系统不支持的特殊字符，保留中文字符
+      safeName = originalName.replace(/[<>:"/\\|?*]/g, '_');
+      
+      // 验证UTF-8编码
+      Buffer.from(safeName, 'utf8');
+    } catch (error) {
+      console.warn('文件名编码处理失败:', error);
+      safeName = `audio_${timestamp}`;
+    }
+    
+    const finalName = `${timestamp}_${safeName}`;
+    console.log(`📁 保存文件: ${file.originalname} -> ${finalName}`);
+    cb(null, finalName);
   },
 });
 

@@ -35,6 +35,54 @@ interface TasksApiResponse {
   timestamp: string;
 }
 
+// 强化的文件名解码函数
+const decodeFilename = (filename: string): string => {
+  if (!filename) return '未知文件';
+  
+  try {
+    // 策略1: 如果已经包含中文字符，可能已经是正确编码
+    const chineseRegex = /[\u4e00-\u9fa5]/;
+    if (chineseRegex.test(filename)) {
+      return filename;
+    }
+    
+    // 策略2: 尝试URL解码（针对前端编码的文件名）
+    try {
+      const decoded = decodeURIComponent(filename);
+      if (decoded !== filename && chineseRegex.test(decoded)) {
+        console.log('文件名URL解码成功:', filename, '->', decoded);
+        return decoded;
+      }
+    } catch (e) {
+      // URL解码失败，继续下一个策略
+    }
+    
+    // 策略3: 尝试Base64解码（如果文件名看起来像Base64）
+    try {
+      if (/^[A-Za-z0-9+/]+=*$/.test(filename) && filename.length > 10) {
+        const decoded = decodeURIComponent(escape(atob(filename)));
+        if (chineseRegex.test(decoded)) {
+          console.log('文件名Base64解码成功:', filename, '->', decoded);
+          return decoded;
+        }
+      }
+    } catch (e) {
+      // Base64解码失败，继续下一个策略
+    }
+    
+    // 策略3: 如果包含乱码字符模式，尝试修复
+    if (/[ææ°è¶å¿]/.test(filename)) {
+      console.warn('检测到文件名乱码，使用原文件名:', filename);
+      // 这里可以添加更多乱码修复逻辑
+    }
+    
+    return filename;
+  } catch (error) {
+    console.warn('文件名解码失败:', error);
+    return filename;
+  }
+};
+
 const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<TranscriptionTask[]>([]);
@@ -603,7 +651,7 @@ ${task.result.segments.map(seg =>
                               onClick={() => handleViewDetails(task)}
                               title="点击查看详情"
                             >
-                              {task.filename}
+                              {decodeFilename(task.filename)}
                             </h3>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                               {getStatusText(task.status)}

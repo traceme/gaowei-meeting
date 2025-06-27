@@ -1,6 +1,106 @@
 import React from 'react'
 import { getEngineDisplayName } from '../utils/engineUtils'
 
+// 格式化音频时长的工具函数
+const formatDuration = (duration: string | number | undefined): string => {
+  if (!duration) {
+    return '未知时长';
+  }
+  
+  // 如果是数字（秒数），转换为时分秒格式
+  if (typeof duration === 'number') {
+    const hours = Math.floor(duration / 3600);
+    const minutes = Math.floor((duration % 3600) / 60);
+    const seconds = Math.floor(duration % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }
+  
+  // 如果是字符串，直接返回（已经是时分秒格式）
+  if (typeof duration === 'string') {
+    return duration;
+  }
+  
+  return '未知时长';
+};
+
+// 格式化文件名的工具函数 - 强化版，解决中文显示问题
+const formatFilename = (filename: string | undefined): string => {
+  if (!filename) {
+    return '未知文件';
+  }
+  
+  try {
+    // 策略1: 如果已经包含中文字符，可能已经是正确编码
+    const chineseRegex = /[\u4e00-\u9fa5]/;
+    if (chineseRegex.test(filename)) {
+      return filename;
+    }
+    
+    // 策略2: 尝试URL解码（针对前端编码的文件名）
+    try {
+      const decoded = decodeURIComponent(filename);
+      if (decoded !== filename && chineseRegex.test(decoded)) {
+        console.log('文件名URL解码成功:', filename, '->', decoded);
+        return decoded;
+      }
+    } catch (e) {
+      // URL解码失败，继续下一个策略
+    }
+    
+    // 策略3: 尝试Base64解码（如果文件名看起来像Base64）
+    try {
+      if (/^[A-Za-z0-9+/]+=*$/.test(filename) && filename.length > 10) {
+        const decoded = decodeURIComponent(escape(atob(filename)));
+        if (chineseRegex.test(decoded)) {
+          console.log('文件名Base64解码成功:', filename, '->', decoded);
+          return decoded;
+        }
+      }
+    } catch (e) {
+      // Base64解码失败，继续下一个策略
+    }
+    
+    return filename;
+  } catch (error) {
+    console.warn('文件名解码失败:', error);
+    return filename;
+  }
+};
+
+// 格式化日期时间的工具函数 - 修复Invalid Date问题
+const formatDateTime = (dateTime: string | undefined): string => {
+  if (!dateTime) {
+    return '未知时间';
+  }
+  
+  try {
+    const date = new Date(dateTime);
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      console.warn('无效的日期时间格式:', dateTime);
+      return '时间格式错误';
+    }
+    
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  } catch (error) {
+    console.warn('日期时间解析失败:', error);
+    return '时间解析错误';
+  }
+};
+
 interface TranscriptionProgressProps {
   files: Array<{
     name: string
@@ -144,7 +244,7 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
               <div className="flex items-center space-x-4">
                 <div className="text-2xl">🎵</div>
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">{file.name}</p>
+                  <p className="font-medium text-gray-900 text-sm">{formatFilename(file.name)}</p>
                   <p className="text-xs text-gray-500">
                     {formatFileSize(file.size)} • {file.type}
                   </p>
@@ -294,19 +394,12 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                   <div className="flex">
                     <span className="text-gray-600 w-20">文件名:</span>
-                    <span className="font-medium text-gray-900">{currentTask.filename}</span>
+                    <span className="font-medium text-gray-900">{formatFilename(currentTask.filename)}</span>
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">开始时间:</span>
                     <span className="font-medium text-gray-900">
-                      {new Date(currentTask.createdAt).toLocaleString('zh-CN', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                      })}
+                      {formatDateTime(currentTask.createdAt)}
                     </span>
                   </div>
                   <div className="flex">
@@ -321,7 +414,7 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">音频时长:</span>
-                    <span className="font-medium text-gray-900">{currentTask.duration || '0:03:31'}</span>
+                    <span className="font-medium text-gray-900">{formatDuration(currentTask.duration)}</span>
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">已用时间:</span>
@@ -361,4 +454,4 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
   )
 }
 
-export default TranscriptionProgress 
+export default TranscriptionProgress

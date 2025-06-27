@@ -1,8 +1,33 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Whisper转录引擎服务
 基于faster-whisper实现的HTTP API服务
 """
+
+import os
+import sys
+import locale
+
+# 设置UTF-8编码环境
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+# 设置locale为UTF-8
+try:
+    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+    except locale.Error:
+        # 如果都不可用，至少设置LC_CTYPE
+        try:
+            locale.setlocale(locale.LC_CTYPE, 'C.UTF-8')
+        except locale.Error:
+            pass
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -323,7 +348,85 @@ def transcribe():
         temp_file_path = os.path.join(temp_dir, f"whisper_{task_id}{file_extension}")
         file.save(temp_file_path)
         
-        logger.info(f"收到转录请求 - 任务ID: {task_id}, 语言: {language}, 文件: {file.filename}")
+        # 强化文件名编码处理 - 处理多种可能的编码问题
+        def fix_filename_encoding(raw_filename):
+            """修复文件名编码问题的强化函数"""
+            if not raw_filename:
+                return f"音频文件_{task_id}"
+            
+            # 尝试多种编码修复策略
+            strategies = [
+                # 策略1: 直接使用（如果已经是正确的UTF-8）
+                lambda fn: fn if isinstance(fn, str) and fn.encode('utf-8') else None,
+                
+                # 策略2: 如果是bytes，尝试UTF-8解码
+                lambda fn: fn.decode('utf-8') if isinstance(fn, bytes) else None,
+                
+                # 策略3: 尝试从Latin-1解码为UTF-8（常见的HTTP传输问题）
+                lambda fn: fn.encode('latin-1').decode('utf-8') if isinstance(fn, str) else None,
+                
+                # 策略4: 尝试从GBK解码（中文系统常见问题）
+                lambda fn: fn.encode('latin-1').decode('gbk') if isinstance(fn, str) else None,
+                
+                # 策略5: 使用chardet自动检测编码
+                lambda fn: _detect_and_decode(fn) if isinstance(fn, (str, bytes)) else None,
+            ]
+            
+            for i, strategy in enumerate(strategies):
+                try:
+                    result = strategy(raw_filename)
+                    if result and result != raw_filename:
+                        logger.info(f"文件名编码修复成功 (策略{i+1}): {raw_filename} -> {result}")
+                        # 验证结果
+                        result.encode('utf-8')
+                        return result
+                    elif result:
+                        return result
+                except Exception as e:
+                    logger.debug(f"文件名编码策略{i+1}失败: {e}")
+                    continue
+            
+            # 所有策略都失败，使用安全的回退名称
+            logger.warning(f"文件名编码修复失败，使用安全名称: {raw_filename}")
+            return f"音频文件_{task_id}"
+        
+        def _detect_and_decode(data):
+            """使用chardet检测编码并解码"""
+            try:
+                import chardet
+                if isinstance(data, str):
+                    data = data.encode('latin-1')  # 先转为bytes
+                detected = chardet.detect(data)
+                if detected and detected['confidence'] > 0.8:
+                    return data.decode(detected['encoding'])
+            except ImportError:
+                logger.debug("chardet库未安装，跳过自动编码检测")
+            except Exception as e:
+                logger.debug(f"自动编码检测失败: {e}")
+            return None
+        
+        # 处理Base64编码的文件名
+        filename_base64 = request.form.get('filename_base64')
+        if filename_base64:
+            try:
+                import base64
+                import urllib.parse
+                # 解码Base64文件名
+                decoded_filename = urllib.parse.unquote(base64.b64decode(filename_base64).decode('utf-8'))
+                filename_display = decoded_filename
+                logger.info(f"文件名Base64解码成功: {file.filename} -> {filename_display}")
+            except Exception as e:
+                logger.warning(f"文件名Base64解码失败: {e}, 使用原文件名")
+                filename_display = fix_filename_encoding(file.filename)
+        else:
+            # 应用文件名修复
+            try:
+                filename_display = fix_filename_encoding(file.filename)
+            except Exception as e:
+                logger.error(f"文件名处理发生意外错误: {e}")
+                filename_display = f"音频文件_{task_id}"
+        
+        logger.info(f"收到转录请求 - 任务ID: {task_id}, 语言: {language}, 文件: {filename_display}")
         
         # 获取音频时长
         duration = get_audio_duration(temp_file_path)
@@ -336,7 +439,7 @@ def transcribe():
                 "status": "processing",
                 "progress": 5,
                 "progress_text": "转录任务开始...",
-                "filename": file.filename,
+                "filename": filename_display,
                 "language": language,
                 "duration": duration,
                 "created_at": datetime.now().isoformat()

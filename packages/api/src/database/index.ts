@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { mkdirSync, existsSync } from 'fs';
+import Database from 'better-sqlite3';
 import type {
   Meeting,
   Transcript,
@@ -146,6 +147,27 @@ export class DatabaseManager {
         FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
       )
     `);
+
+    // 数据库迁移：添加音频时长字段到 transcription_tasks 表
+    try {
+      this.db.exec(`
+        ALTER TABLE transcription_tasks 
+        ADD COLUMN duration TEXT
+      `);
+      console.log('✅ 数据库迁移: 添加 duration 字段到 transcription_tasks');
+    } catch (error) {
+      // 字段可能已存在，忽略错误
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transcription_tasks 
+        ADD COLUMN duration_seconds INTEGER
+      `);
+      console.log('✅ 数据库迁移: 添加 duration_seconds 字段到 transcription_tasks');
+    } catch (error) {
+      // 字段可能已存在，忽略错误
+    }
 
     // 创建设置表
     this.db.exec(`
@@ -303,28 +325,122 @@ export class DatabaseManager {
   // ===== 转录任务管理 =====
 
   createTranscriptionTask(
-    meetingId: string,
-    filename: string
+    meetingId: string, 
+    filename: string, 
+    duration?: string,
+    durationSeconds?: number
   ): TranscriptionTask {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
-    const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // 确保文件名正确存储UTF-8编码
+    let safeFilename: string;
+    try {
+      // 验证和处理文件名编码
+      safeFilename = Buffer.from(filename, 'utf8').toString('utf8');
+    } catch (error) {
+      console.warn('文件名编码处理失败，使用安全名称:', error);
+      safeFilename = `音频文件_${Date.now()}`;
+    }
 
     const stmt = this.db.prepare(`
-      INSERT INTO transcription_tasks (id, meeting_id, filename, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO transcription_tasks (
+        id, meeting_id, filename, status, progress, created_at, updated_at, duration, duration_seconds
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    
+    stmt.run(
+      taskId, 
+      meetingId, 
+      safeFilename,  // 使用处理过的安全文件名
+      'pending', 
+      0, 
+      now, 
+      now,
+      duration || null,
+      durationSeconds || null
+    );
 
-    stmt.run(id, meetingId, filename, now, now);
+    console.log(`📊 转录任务已创建: ${safeFilename} (任务ID: ${taskId})`);
 
     return {
-      id,
+      id: taskId,
       meeting_id: meetingId,
-      filename,
+      filename: safeFilename,
       status: 'pending',
       progress: 0,
       created_at: now,
       updated_at: now,
+      duration,
+      duration_seconds: durationSeconds,
     };
+  }
+
+  updateTranscriptionTask(
+    taskId: string, 
+    updates: Partial<TranscriptionTask>
+  ): boolean {
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    // 构建动态更新查询
+    Object.entries(updates).forEach(([key, value]) => {
+      if (key !== 'id' && key !== 'created_at' && value !== undefined) {
+        if (key === 'result' || key === 'summary') {
+          // JSON字段需要序列化
+          fields.push(`${key} = ?`);
+          values.push(typeof value === 'string' ? value : JSON.stringify(value));
+        } else if (key === 'filename') {
+          // 确保文件名正确处理UTF-8编码
+          let safeFilename: string;
+          try {
+            safeFilename = Buffer.from(value as string, 'utf8').toString('utf8');
+          } catch (error) {
+            console.warn('更新时文件名编码处理失败:', error);
+            safeFilename = value as string; // 使用原值作为备用
+          }
+          fields.push(`${key} = ?`);
+          values.push(safeFilename);
+        } else {
+          fields.push(`${key} = ?`);
+          values.push(value);
+        }
+      }
+    });
+
+    if (fields.length === 0) return false;
+
+    fields.push('updated_at = ?');
+    values.push(now, taskId);
+
+    const stmt = this.db.prepare(`
+      UPDATE transcription_tasks SET ${fields.join(', ')} WHERE id = ?
+    `);
+
+    const result = stmt.run(...values);
+    const success = result.changes > 0;
+    
+    if (success) {
+      console.log(`📊 转录任务已更新: ${taskId}`);
+    }
+    
+    return success;
+  }
+
+  deleteTranscriptionTask(taskId: string): boolean {
+    const stmt = this.db.prepare(`
+      DELETE FROM transcription_tasks WHERE id = ?
+    `);
+    
+    const result = stmt.run(taskId);
+    const success = result.changes > 0;
+    
+    if (success) {
+      console.log(`🗑️ 转录任务已删除: ${taskId}`);
+    }
+    
+    return success;
   }
 
   getTranscriptionTask(taskId: string): TranscriptionTask | null {
