@@ -151,7 +151,29 @@ export class MeetingManager {
   }
 
   async getTranscriptionTask(id: string): Promise<TranscriptionTask | null> {
-    return this.db.getTranscriptionTask(id);
+    const task = this.db.getTranscriptionTask(id);
+    if (!task) return null;
+
+    // 🕒 计算已用时间 (elapsedTime) - 从任务创建到现在的秒数
+    const calculateElapsedTime = (createdAt: string): number => {
+      try {
+        const startTime = new Date(createdAt);
+        const currentTime = new Date();
+        const elapsedMs = currentTime.getTime() - startTime.getTime();
+        return Math.floor(elapsedMs / 1000); // 转换为秒
+      } catch (error) {
+        console.warn('计算已用时间失败:', error);
+        return 0; // 如果计算失败，返回0秒
+      }
+    };
+
+    // 为任务对象添加计算出的已用时间
+    const taskWithElapsedTime = {
+      ...task,
+      elapsedTime: calculateElapsedTime(task.created_at!),
+    };
+
+    return taskWithElapsedTime;
   }
 
   async getAllTranscriptionTasks(filters?: {

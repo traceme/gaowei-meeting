@@ -107,6 +107,9 @@ export interface TranscriptionTask {
   actual_filename?: string;
   duration?: string; // 音频时长（格式化后的字符串，如 "3:45"）
   duration_seconds?: number; // 音频时长（秒数）
+  elapsedTime?: number; // 已用时间（秒数）
+  estimatedTime?: number; // 预计总时间（秒数）
+  engine?: string; // 转录引擎
 }
 
 // 处理任务类型

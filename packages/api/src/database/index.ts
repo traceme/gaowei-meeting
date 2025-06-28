@@ -98,6 +98,8 @@ export class DatabaseManager {
         error TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        duration TEXT,
+        duration_seconds INTEGER,
         FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
       )
     `);

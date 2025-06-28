@@ -187,9 +187,9 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
         // duration 格式可能是 "3:45" 或 "0:03:45"
         const parts = currentTask.duration.split(':').map(Number)
         if (parts.length === 2) {
-          return parts[0] + parts[1] / 60 // 分:秒
+          return (parts[0] || 0) + (parts[1] || 0) / 60 // 分:秒
         } else if (parts.length === 3) {
-          return parts[0] * 60 + parts[1] + parts[2] / 60 // 时:分:秒
+          return (parts[0] || 0) * 60 + (parts[1] || 0) + (parts[2] || 0) / 60 // 时:分:秒
         }
       }
       
@@ -227,7 +227,8 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
   }
   
   const estimatedMinutes = calculateEstimatedMinutes()
-  const elapsedSeconds = currentTask?.elapsedTime || 75
+  // 🕒 动态显示已用时间，而不是固定的75秒
+  const elapsedSeconds = currentTask?.elapsedTime || 0
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 p-6">
@@ -418,7 +419,12 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
                   </div>
                   <div className="flex">
                     <span className="text-gray-600 w-20">已用时间:</span>
-                    <span className="font-medium text-gray-900">{elapsedSeconds}秒</span>
+                    <span className="font-medium text-gray-900">
+                      {elapsedSeconds >= 60 
+                        ? `${Math.floor(elapsedSeconds / 60)}分${elapsedSeconds % 60}秒`
+                        : `${elapsedSeconds}秒`
+                      }
+                    </span>
                   </div>
                 </div>
               </div>
