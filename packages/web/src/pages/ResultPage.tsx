@@ -76,6 +76,7 @@ const ResultPage: React.FC = () => {
         throw new Error('任务尚未完成或结果不可用');
       }
 
+      
       setTask(taskData);
     } catch (err) {
       console.error('获取任务失败:', err);
@@ -287,6 +288,7 @@ ${task.result.segments.map((seg, index) => {
   };
 
   // 将任务数据转换为TranscriptionData格式
+  
   const transcriptionData: TranscriptionData = {
     id: task.id,
     filename: task.filename,

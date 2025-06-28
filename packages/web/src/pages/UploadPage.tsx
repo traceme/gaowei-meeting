@@ -206,19 +206,24 @@ const UploadPage = () => {
       
       // 检查响应数据结构
       const taskId = result.data?.taskId || result.taskId
+      const createdAt = result.data?.createdAt || result.createdAt
+      const serverFilename = result.data?.filename || result.filename
+      const duration = result.data?.duration || result.duration
+      
       if (!taskId) {
         console.error('❌ 响应中缺少 taskId:', result)
         throw new Error('服务器响应格式错误：缺少任务ID')
       }
       
-      // 设置当前任务并开始轮询，包含引擎信息
+      // 设置当前任务并开始轮询，使用服务器返回的创建时间和文件名
       setCurrentTask({
         id: taskId,
         status: 'pending',
-        filename: file.name,
+        filename: serverFilename || file.name,  // 优先使用服务器返回的文件名
         progress: 0,
-        createdAt: new Date().toISOString(),
+        createdAt: createdAt || new Date().toISOString(), // 使用服务器时间，如果没有则回退到前端时间
         engine: currentEngine, // 包含当前选择的引擎
+        duration: duration,    // 添加音频时长信息
       })
       
       console.log('🔄 开始轮询转录状态, taskId:', taskId)
@@ -266,13 +271,25 @@ const UploadPage = () => {
         
         console.log(`📈 任务状态: ${task.status}, 进度: ${task.progress}%`)
         
-        // 更新任务状态，保留引擎信息和正确的文件名
-        setCurrentTask(prevTask => ({
-          ...task,
-          // 保留之前解码的正确文件名，防止被服务器返回的乱码覆盖
-          filename: prevTask?.filename || decodeFilename(task.filename),
-          engine: prevTask?.engine || currentEngine
-        }))
+        // 更新任务状态，保留引擎信息、正确的文件名和创建时间
+        setCurrentTask(prevTask => {
+            
+          return {
+            ...task,
+            // 保留之前解码的正确文件名，防止被服务器返回的乱码覆盖
+            filename: prevTask?.filename || decodeFilename(task.filename),
+            engine: prevTask?.engine || currentEngine,
+            // 保留初始的创建时间，防止被轮询时的updated_at覆盖
+            createdAt: prevTask?.createdAt || task.created_at || task.createdAt,
+            // 保留音频时长信息
+            duration: prevTask?.duration || task.duration,
+            // 🔧 确保完整保留result数据，特别是segments中的words字段
+            result: task.result ? {
+              ...task.result,
+              segments: task.result.segments || []
+            } : undefined,
+          };
+        })
         
         // 更新进度条
         if (task.status === 'processing') {
@@ -475,6 +492,7 @@ const UploadPage = () => {
 
   // 如果显示转录结果，直接渲染TranscriptionDetail（不受上传页面容器约束）
   if (currentTask && currentTask.status === 'completed' && currentTask.result) {
+    
     // 将转录数据转换为TranscriptionData格式
     const transcriptionData: TranscriptionData = {
       id: currentTask.id,
@@ -484,7 +502,8 @@ const UploadPage = () => {
       segments: currentTask.result.segments?.map((seg: any) => ({
         start: seg.start || seg.t0 || 0,
         end: seg.end || seg.t1 || 0,
-        text: seg.text
+        text: seg.text,
+        words: seg.words || []
       })) || [],
       audioUrl: selectedFiles[0] ? URL.createObjectURL(selectedFiles[0]) : undefined,
       createdAt: currentTask.createdAt,

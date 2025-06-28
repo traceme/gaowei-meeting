@@ -172,6 +172,9 @@ router.post('/upload', async (req: Request, res: Response) => {
       message: '文件上传成功，转录已开始',
       meetingId: currentMeetingId,
       taskId: task.id,
+      createdAt: task.created_at, // 添加任务创建时间
+      filename: task.filename,    // 添加正确的文件名
+      duration: task.duration,    // 添加音频时长
     });
   } catch (error) {
     sendError(
@@ -205,6 +208,7 @@ router.get('/:taskId', async (req: Request, res: Response) => {
         meeting.audioPath.split('/').pop() : task.filename,
     };
 
+    
     sendSuccess(res, { task: taskWithAudioPath });
   } catch (error) {
     sendError(
@@ -529,13 +533,40 @@ async function processTranscriptionInBackground(
                   console.warn('调试文件写入失败:', debugError);
                 }
                 
+                // 🔧 修复：如果segments没有words字段，基于文本生成简单的词级时间戳
+                const processedSegments = (status.result.segments || []).map((segment: any) => {
+                  if (!segment.words || segment.words.length === 0) {
+                    // 如果没有词级时间戳，基于segment文本生成简单的词分割
+                    const words = segment.text?.trim().split(/\s+/) || [];
+                    const segmentDuration = segment.end - segment.start;
+                    const wordsPerSecond = words.length / segmentDuration;
+                    
+                    segment.words = words.map((word: string, index: number) => {
+                      const wordDuration = 1 / wordsPerSecond;
+                      const wordStart = segment.start + (index * wordDuration);
+                      const wordEnd = Math.min(wordStart + wordDuration, segment.end);
+                      
+                      return {
+                        word: word,
+                        start: Number(wordStart.toFixed(3)),
+                        end: Number(wordEnd.toFixed(3)),
+                        probability: 0.9 // 估算的置信度
+                      };
+                    });
+                    
+                    console.log(`🔧 为segment生成了${segment.words.length}个词级时间戳`);
+                  }
+                  return segment;
+                });
+
                 const result = {
                   text: status.result.text || '',
                   language: status.result.language || 'unknown',
                   duration: status.result.duration || 0,
                   confidence: 0.95,
-                  segments: status.result.segments || [],
+                  segments: processedSegments,
                 };
+                
                 
                 // 更新任务状态为完成
                 await meetingManager.updateTranscriptionTask(taskId, {
@@ -588,13 +619,40 @@ async function processTranscriptionInBackground(
         // 保存完整的segments数据，包括词级时间戳
         const segments = whisperResult.segments || [];
         
+        // 🔧 修复：如果segments没有words字段，基于文本生成简单的词级时间戳
+        const processedSegments = segments.map((segment: any) => {
+          if (!segment.words || segment.words.length === 0) {
+            // 如果没有词级时间戳，基于segment文本生成简单的词分割
+            const words = segment.text?.trim().split(/\s+/) || [];
+            const segmentDuration = segment.end - segment.start;
+            const wordsPerSecond = words.length / segmentDuration;
+            
+            segment.words = words.map((word: string, index: number) => {
+              const wordDuration = 1 / wordsPerSecond;
+              const wordStart = segment.start + (index * wordDuration);
+              const wordEnd = Math.min(wordStart + wordDuration, segment.end);
+              
+              return {
+                word: word,
+                start: Number(wordStart.toFixed(3)),
+                end: Number(wordEnd.toFixed(3)),
+                probability: 0.9 // 估算的置信度
+              };
+            });
+            
+            console.log(`🔧 为segment生成了${segment.words.length}个词级时间戳`);
+          }
+          return segment;
+        });
+        
         const result = {
           text: whisperResult.text || '',
           language: whisperResult.detected_language || whisperResult.language || 'unknown',
           duration: whisperResult.duration || 0,
           confidence: 0.95,
-          segments: segments,
+          segments: processedSegments,
         };
+        
         
         await meetingManager.updateTranscriptionTask(taskId, {
           status: 'completed',

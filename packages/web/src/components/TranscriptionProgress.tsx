@@ -75,19 +75,22 @@ const formatFilename = (filename: string | undefined): string => {
 // 格式化日期时间的工具函数 - 修复Invalid Date问题
 const formatDateTime = (dateTime: string | undefined): string => {
   if (!dateTime) {
+    console.warn('🕒 formatDateTime: 收到空的日期时间');
     return '未知时间';
   }
+  
+  console.log('🕒 formatDateTime: 处理日期时间:', dateTime);
   
   try {
     const date = new Date(dateTime);
     
     // 检查日期是否有效
     if (isNaN(date.getTime())) {
-      console.warn('无效的日期时间格式:', dateTime);
+      console.warn('🕒 formatDateTime: 无效的日期时间格式:', dateTime);
       return '时间格式错误';
     }
     
-    return date.toLocaleString('zh-CN', {
+    const formatted = date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -95,8 +98,11 @@ const formatDateTime = (dateTime: string | undefined): string => {
       minute: '2-digit',
       second: '2-digit'
     });
+    
+    console.log('🕒 formatDateTime: 格式化结果:', formatted);
+    return formatted;
   } catch (error) {
-    console.warn('日期时间解析失败:', error);
+    console.warn('🕒 formatDateTime: 日期时间解析失败:', error);
     return '时间解析错误';
   }
 };
