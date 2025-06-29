@@ -157,6 +157,19 @@ const UploadPage = () => {
     setIsUploading(true)
     setShowProgress(true)
     
+    // 🚀 优化：立即设置临时任务状态，让页面立即跳转到进度页面
+    const tempTaskId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    setCurrentTask({
+      id: tempTaskId,
+      status: 'pending',
+      filename: file.name,
+      progress: 0,
+      createdAt: new Date().toISOString(),
+      engine: currentEngine,
+      duration: undefined,
+      currentStage: '文件上传中...',
+    })
+    
     try {
       // 准备FormData - 确保文件名正确编码
       const formData = new FormData()
@@ -215,16 +228,18 @@ const UploadPage = () => {
         throw new Error('服务器响应格式错误：缺少任务ID')
       }
       
-      // 设置当前任务并开始轮询，使用服务器返回的创建时间和文件名
-      setCurrentTask({
-        id: taskId,
+      // 🔄 更新任务状态：用真实的任务ID和服务器数据替换临时任务
+      setCurrentTask(prevTask => ({
+        ...prevTask, // 保留临时任务的状态（如engine等）
+        id: taskId,  // 🆔 更新为真实的任务ID
         status: 'pending',
         filename: serverFilename || file.name,  // 优先使用服务器返回的文件名
         progress: 0,
         createdAt: createdAt || new Date().toISOString(), // 使用服务器时间，如果没有则回退到前端时间
         engine: currentEngine, // 包含当前选择的引擎
         duration: duration,    // 添加音频时长信息
-      })
+        currentStage: '文件上传完成，准备开始转录...', // 🎯 更新阶段提示
+      }))
       
       console.log('🔄 开始轮询转录状态, taskId:', taskId)
       
@@ -233,9 +248,19 @@ const UploadPage = () => {
       
     } catch (error) {
       console.error('❌ 上传失败:', error)
-      alert(`上传失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      
+      // 🚨 更新任务状态为错误状态，而不是直接隐藏进度页面
+      setCurrentTask(prevTask => prevTask ? {
+        ...prevTask,
+        status: 'error',
+        currentStage: '文件上传失败',
+        error: error instanceof Error ? error.message : '未知错误',
+        progress: 0,
+      } : null)
+      
       setIsUploading(false)
-      setShowProgress(false)
+      // 🎯 保持showProgress为true，让用户在进度页面看到错误信息
+      // setShowProgress(false) // 注释掉，让错误在进度页面显示
     }
   }
   

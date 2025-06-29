@@ -374,18 +374,25 @@ const TranscriptionProgress: React.FC<TranscriptionProgressProps> = ({
             {/* 当前阶段信息 */}
             <div className="bg-blue-50 rounded-lg p-6 mb-6 border border-blue-200">
               <div className="flex items-center space-x-4">
-                <div className="text-3xl animate-bounce">{stages[currentStageIndex]?.icon || '🎙️'}</div>
+                {/* 🎯 优化：优先显示自定义的 currentStage 状态 */}
+                <div className="text-3xl animate-bounce">
+                  {currentTask.currentStage?.includes('上传') ? '📤' : stages[currentStageIndex]?.icon || '🎙️'}
+                </div>
                 <div>
                   <p className="font-semibold text-blue-900 text-lg">
-                    {stages[currentStageIndex]?.name || '语音识别'}进行中...
+                    {/* 🎯 优先显示自定义的当前阶段信息 */}
+                    {currentTask.currentStage || `${stages[currentStageIndex]?.name || '语音识别'}进行中...`}
                   </p>
                   <p className="text-blue-700 mt-1">
-                    预计剩余时间: 约 {
-                      estimatedMinutes < 1 
-                        ? '不到1分钟' 
-                        : estimatedMinutes === 1 
-                        ? '1分钟' 
-                        : `${estimatedMinutes}分钟`
+                    {currentTask.currentStage?.includes('上传') 
+                      ? '正在上传文件到服务器，请稍候...' 
+                      : `预计剩余时间: 约 ${
+                          estimatedMinutes < 1 
+                            ? '不到1分钟' 
+                            : estimatedMinutes === 1 
+                            ? '1分钟' 
+                            : `${estimatedMinutes}分钟`
+                        }`
                     }
                   </p>
                 </div>
