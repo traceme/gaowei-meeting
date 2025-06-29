@@ -192,3 +192,6 @@ packages/api/data/*.db-wal
 
 # serena pass
 .serena/
+
+# 临时文件
+archive/

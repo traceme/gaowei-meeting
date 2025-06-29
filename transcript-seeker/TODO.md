@@ -1,8 +1,0 @@
-- [ ] Re-add VTT subtitles on video
-- [ ] Add the ability to download SRT, Docx, MD directly in the front-end
-- [ ] Add the ability to correct the transcript + re-align the transcription once done
-- [ ] Switch the entire tool stack to yarn; remove pnpm
-- [ ] Add strong typing; improving tooling
-- [ ] Connect other LLM providers than OpenAI
-- [ ] Implement transcript-wide search
-- [ ] Implement RAG for chat, with pgvector
