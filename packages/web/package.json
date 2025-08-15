@@ -1,7 +1,7 @@
 {
   "name": "@gaowei/web",
   "version": "1.0.0",
-  "description": "高维会议AI前端应用",
+  "description": "\u9ad8\u7ef4\u4f1a\u8baeAI\u524d\u7aef\u5e94\u7528",
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -22,8 +22,6 @@
     "zustand": "^4.4.0"
   },
   "devDependencies": {
-    "@gaowei/eslint-config": "workspace:*",
-    "@gaowei/typescript-config": "workspace:*",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",

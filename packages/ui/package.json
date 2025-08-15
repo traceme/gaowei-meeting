@@ -1,7 +1,7 @@
 {
   "name": "@gaowei/ui",
   "version": "0.1.0",
-  "description": "高维会议AI共享UI组件库",
+  "description": "\u9ad8\u7ef4\u4f1a\u8baeAI\u5171\u4eabUI\u7ec4\u4ef6\u5e93",
   "private": true,
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -27,7 +27,6 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
-    "@gaowei/typescript-config": "*",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "autoprefixer": "^10.4.20",

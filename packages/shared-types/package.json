@@ -1,7 +1,7 @@
 {
   "name": "@gaowei/shared-types",
   "version": "1.0.0",
-  "description": "共享类型定义",
+  "description": "\u5171\u4eab\u7c7b\u578b\u5b9a\u4e49",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -21,8 +21,6 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@gaowei/eslint-config": "workspace:*",
-    "@gaowei/typescript-config": "workspace:*",
     "eslint": "^8.57.0",
     "tsup": "^8.0.1",
     "typescript": "^5.6.2"
